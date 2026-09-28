@@ -5,7 +5,7 @@ let replSet: MongoMemoryReplSet | undefined;
 export default async function setup() {
   // Single-node replica set: required for prisma.$transaction (register route)
   replSet = await MongoMemoryReplSet.create();
-  process.env.TEST_DATABASE_URL = replSet.getUri('expense-tracker-test');
+  process.env.DATABASE_URL = replSet.getUri('expense-tracker-test');
 }
 
 export async function teardown() {

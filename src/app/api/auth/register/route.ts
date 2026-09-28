@@ -4,18 +4,7 @@ import { registerSchema } from '@/lib/validations';
 import { generateSessionToken, hashSessionToken } from '@/lib/session';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
-
-const DEFAULT_CATEGORIES = [
-  'groceries',
-  'utilities',
-  'rent',
-  'education',
-  'daily essentials',
-  'food',
-  'travel',
-  'entertainment',
-  'healthcare',
-];
+import { DEFAULT_CATEGORIES } from '@/lib/default-category';
 
 export async function POST(request: Request) {
   try {

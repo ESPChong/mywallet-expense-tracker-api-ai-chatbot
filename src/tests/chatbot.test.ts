@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { resetRateLimiter } from '@/lib/rateLimit';
-import { OFFLINE_MODE_PREFIX } from '@/services/chatbotService';
 import { buildChatbotContext, computeProjection } from '@/services/chatbotContextService';
 import { getMonthBreakdown, listExpenses } from '@/services/chatbotToolsService';
+import { AIMessage, type BaseMessage } from '@langchain/core/messages';
+import { BaseChatModel, type ChatResult } from '@langchain/core/language_models/chat_models';
+import type { ChatbotContext } from '@/services/chatbotContextService';
+import { generateChatbotReply, OFFLINE_MODE_PREFIX } from '@/services/chatbotService';
+
 import {
   req,
   createUserWithSession,
@@ -14,6 +18,58 @@ import {
   seedExpense,
 } from './helpers';
 import { POST as chatbot } from '@/app/api/chatbot/route';
+
+// Scripted chat model: LangGraph drives the REAL agent loop (including real
+// tool execution against the test DB); the "model" is just a canned script.
+class ScriptedModel extends BaseChatModel {
+  calls = 0;
+  constructor(private script: BaseMessage[]) {
+    super({});
+  }
+  _llmType() {
+    return 'scripted';
+  }
+  bindTools() {
+    return this;
+  }
+  async _generate(): Promise<ChatResult> {
+    const message = this.script[Math.min(this.calls, this.script.length - 1)];
+    this.calls += 1;
+    return { generations: [{ message, text: '' }] };
+  }
+}
+
+class ThrowingModel extends BaseChatModel {
+  _llmType() {
+    return 'throwing';
+  }
+  bindTools() {
+    return this;
+  }
+  async _generate(): Promise<ChatResult> {
+    throw new Error('fetch failed');
+  }
+}
+
+function stubContext(): ChatbotContext {
+  return {
+    asOf: '2025-06-18T12:00:00.000Z',
+    currency: 'USD',
+    amountUnit: 'cents',
+    currentMonth: {
+      period: '2025-06',
+      income: 0,
+      expenses: 0,
+      net: 0,
+      expenseCount: 0,
+      topCategories: [],
+    },
+    trailingMonths: [],
+    activeIncomes: [],
+    allTime: { totalSavings: 0 },
+    projection: null,
+  };
+}
 
 function currentPeriod() {
   const now = new Date();
@@ -97,6 +153,7 @@ describe('POST /api/chatbot', () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.mode).toBe('offline');
     expect(body.reply.startsWith(OFFLINE_MODE_PREFIX)).toBe(true);
     expect(body.reply).toContain('$50.00'); // 5000 cents
     expect(body.reply).toContain('$1,000.00'); // 100000 cents
@@ -285,5 +342,75 @@ describe('chatbot tools', () => {
     const missing = await listExpenses(user.id, { month: '2025-05', category: 'nope' });
     expect(missing.expenses).toHaveLength(0);
     expect(missing.note).toBeDefined();
+  });
+});
+
+describe('generateChatbotReply (LLM paths, scripted model)', () => {
+  it('returns the model answer with mode "llm"', async () => {
+    const { user } = await createUserWithSession();
+    const { reply, mode, payload } = await generateChatbotReply(
+      { user, context: stubContext(), history: [], message: 'How am I doing?' },
+      { modelFactory: () => new ScriptedModel([new AIMessage('You spent $75.00 this month.')]) },
+    );
+    expect(mode).toBe('llm');
+    expect(reply).toContain('$75.00');
+    expect(payload.messages).toHaveLength(2);
+    expect(payload.tools).toHaveLength(2);
+  });
+
+  it('executes REAL tools when the model emits tool calls (full agent loop)', async () => {
+    const { user } = await createUserWithSession();
+    await prisma.income.create({
+      data: {
+        amount: 100000,
+        dayOfMonth: 1,
+        userId: user.id,
+        createdAt: new Date(Date.UTC(2025, 3, 1)), // existed before May 2025
+      },
+    });
+    const scripted = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ name: 'get_month_breakdown', args: { year: 2025, month: 5 }, id: 'call_1' }],
+      }),
+      new AIMessage('Here is your May breakdown.'),
+    ];
+
+    const { mode } = await generateChatbotReply(
+      { user, context: stubContext(), history: [], message: 'What about May?' },
+      { modelFactory: () => new ScriptedModel(scripted) },
+    );
+
+    expect(mode).toBe('llm');
+    // Proof the agent executed our real, userId-scoped tool against the DB:
+    expect(await prisma.incomeEntry.count({ where: { userId: user.id, period: '2025-05' } })).toBe(
+      1,
+    );
+  });
+
+  it('falls back to offline mode when the LLM is unreachable', async () => {
+    const { user } = await createUserWithSession();
+    const { reply, mode } = await generateChatbotReply(
+      { user, context: stubContext(), history: [], message: 'hi' },
+      { modelFactory: () => new ThrowingModel() },
+    );
+    expect(mode).toBe('offline');
+    expect(reply.startsWith(OFFLINE_MODE_PREFIX)).toBe(true);
+  });
+
+  it('falls back when the model ends without final text (empty reply edge case)', async () => {
+    const { user } = await createUserWithSession();
+    const scripted = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ name: 'get_month_breakdown', args: { year: 2025, month: 5 }, id: 'call_1' }],
+      }),
+      new AIMessage(''),
+    ];
+    const { mode } = await generateChatbotReply(
+      { user, context: stubContext(), history: [], message: 'hi' },
+      { modelFactory: () => new ScriptedModel(scripted) },
+    );
+    expect(mode).toBe('offline');
   });
 });

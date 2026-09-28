@@ -14,6 +14,7 @@ import { isValidMonthString } from '@/lib/format';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  offline?: boolean;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -22,7 +23,7 @@ const SUGGESTED_QUESTIONS = [
   'What will I end the month at?',
 ];
 
-const OFFLINE_PREFIX = '(offline mode';
+const isOffline = messages.some((m) => m.offline);
 
 export function ChatbotDrawer() {
   const [open, setOpen] = useState(false);
@@ -44,9 +45,6 @@ export function ChatbotDrawer() {
   const searchParams = useSearchParams();
 
   // The offline summary comes back with this prefix until an LLM is wired
-  const isOffline = messages.some(
-    (m) => m.role === 'assistant' && m.content.startsWith(OFFLINE_PREFIX),
-  );
 
   async function send(text: string) {
     const message = text.trim();
@@ -60,11 +58,14 @@ export function ChatbotDrawer() {
       const monthParam = searchParams.get('month');
       const month = isValidMonthString(monthParam) ? monthParam : undefined;
 
-      const res = await api<{ reply: string }>('/api/chatbot', {
+      const res = await api<{ reply: string; mode: 'llm' | 'offline' }>('/api/chatbot', {
         method: 'POST',
         body: { message, history: messages.slice(-10), ...(month && { month }) },
       });
-      setMessages((prev) => [...prev, { role: 'assistant', content: res.reply }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: res.reply, offline: res.mode === 'offline' },
+      ]);
     } catch (error) {
       if (error instanceof ApiError && error.status === 429) {
         toast.error('Daily message limit reached — resets at midnight UTC');

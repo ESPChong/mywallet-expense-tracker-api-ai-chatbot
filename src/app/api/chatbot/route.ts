@@ -1,49 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { chatbotRequestSchema } from '@/lib/validations';
-import { checkRateLimit } from '@/lib/rateLimit';
+import { checkRateLimit, envLimit } from '@/lib/rateLimit';
+import { apiError } from '@/lib/api-response';
 import { buildChatbotContext } from '@/services/chatbotContextService';
 import { generateChatbotReply } from '@/services/chatbotService';
-
-// Optional env: CHATBOT_DAILY_LIMIT (default 50), CHATBOT_MODEL (default in service)
-function dailyLimit(): number {
-  const parsed = Number(process.env.CHATBOT_DAILY_LIMIT);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
-}
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!user) return apiError(401, 'Unauthorized');
 
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return apiError(400, 'Invalid JSON body');
     }
 
     const result = chatbotRequestSchema.safeParse(body);
-    if (!result.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: result.error.issues },
-        { status: 400 },
-      );
-    }
+    if (!result.success) return apiError(400, 'Validation failed', result.error.issues);
     const { message, month, history } = result.data;
 
-    // Rate limit BEFORE any expensive work (context build, later: LLM call)
-    const limit = checkRateLimit(`chatbot:${user.id}`, dailyLimit());
+    const limit = checkRateLimit(`chatbot:${user.id}`, envLimit('CHATBOT_DAILY_LIMIT', 50));
     if (!limit.allowed) {
       return NextResponse.json(
-        { error: 'Daily message limit exceeded', resetAt: limit.resetAt },
+        { success: false, error: 'Daily message limit exceeded', resetAt: limit.resetAt },
         { status: 429 },
       );
     }
 
-    // Resolve target month (default: current UTC month)
     let year: number;
     let monthNum: number;
     if (month) {
@@ -54,19 +40,20 @@ export async function POST(request: NextRequest) {
       monthNum = now.getUTCMonth() + 1;
     }
 
-    // Fresh context every request — data changes between turns, and a stale
-    // snapshot produces confidently wrong answers.
+    // Fresh context every request (POST — materializing due income here is legit)
     const context = await buildChatbotContext(user.id, year, monthNum);
-    const { reply, payload } = await generateChatbotReply({ user, context, history, message });
+    const { reply, mode, payload } = await generateChatbotReply({
+      user,
+      context,
+      history,
+      message,
+    });
 
-    const responseBody: { reply: string; payload?: unknown } = { reply };
-    // ?debug=1 exposes exactly what will be sent to the model
-    if (new URL(request.url).searchParams.get('debug') === '1') {
-      responseBody.payload = payload;
-    }
+    const responseBody: { reply: string; mode: string; payload?: unknown } = { reply, mode };
+    if (new URL(request.url).searchParams.get('debug') === '1') responseBody.payload = payload;
     return NextResponse.json(responseBody);
   } catch (error) {
     console.error('Chatbot API Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return apiError(500, 'Internal Server Error');
   }
 }
