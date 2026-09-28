@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useSearchParams } from 'next/navigation';
 import { isValidMonthString } from '@/lib/format';
+import { MarkdownMessage } from '@/components/chatbot/markdown-message';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -43,8 +44,6 @@ export function ChatbotDrawer() {
   }, [messages, isPending]);
 
   const searchParams = useSearchParams();
-
-  // The offline summary comes back with this prefix until an LLM is wired
 
   async function send(text: string) {
     const message = text.trim();
@@ -149,13 +148,19 @@ export function ChatbotDrawer() {
               >
                 <div
                   className={cn(
-                    'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+                    'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed',
                     m.role === 'user'
                       ? 'bg-primary text-primary-foreground rounded-br-md'
                       : 'bg-muted rounded-bl-md',
                   )}
                 >
-                  {m.content}
+                  {m.role === 'user' || m.offline ? (
+                    // Plain text: user input + offline summaries (\n-delimited —
+                    // markdown would collapse single newlines into one blob)
+                    <span className="whitespace-pre-wrap">{m.content}</span>
+                  ) : (
+                    <MarkdownMessage content={m.content} />
+                  )}
                 </div>
               </div>
             ))

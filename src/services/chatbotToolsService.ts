@@ -2,7 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { processRecurringIncome } from './incomeService';
 
-// ── Tool input schemas (single source of truth — LangChain will reuse these) ──
+// ── Tool input schemas (single source of truth — the LangChain tool()
+// wrappers reuse these) ──
 
 export const getMonthBreakdownParams = z.object({
   year: z.number().int().min(2000).max(2100),
@@ -15,13 +16,19 @@ export const listExpensesParams = z.object({
   limit: z.number().int().min(1).max(50).default(10),
 });
 
-// ── Tool implementations: scoped to userId, return plain JSON ──
+// ── Output convention ───────────────────────────────────────────────────────
+// Tool results go straight into the model's context, so amounts are
+// pre-converted to dollar strings — the model never does unit math on them.
+
+const dollars = (cents: number) => (cents / 100).toFixed(2);
+
+// ── Tool implementations: scoped to userId, plain JSON returns ──
 
 export async function getMonthBreakdown(userId: string, input: unknown) {
   const { year, month } = getMonthBreakdownParams.parse(input);
 
-  // Same idempotent side effect as /api/dashboard, so current-month breakdowns
-  // reflect all due income postings.
+  // Same idempotent side effect as the chatbot route, so current-month
+  // breakdowns reflect all due income postings.
   await processRecurringIncome(userId, year, month);
 
   const start = new Date(Date.UTC(year, month - 1, 1));
@@ -52,17 +59,19 @@ export async function getMonthBreakdown(userId: string, input: unknown) {
 
   return {
     period: `${year}-${String(month).padStart(2, '0')}`,
-    amountUnit: 'cents',
-    totalIncome,
-    totalExpenses,
-    net: totalIncome - totalExpenses,
+    amountUnit: 'dollars',
+    totalIncome: dollars(totalIncome),
+    totalExpenses: dollars(totalExpenses),
+    net: dollars(totalIncome - totalExpenses),
     expenseCount: expenses.length,
     byCategory: [...catMap.values()]
       .map((c) => ({
-        ...c,
+        name: c.name,
+        amount: dollars(c.amount),
+        transactionCount: c.transactionCount,
         percentage: totalExpenses > 0 ? Math.round((c.amount / totalExpenses) * 1000) / 10 : 0,
       }))
-      .sort((a, b) => b.amount - a.amount),
+      .sort((a, b) => b.amount.localeCompare(a.amount) || a.name.localeCompare(b.name)),
   };
 }
 
@@ -89,7 +98,7 @@ export async function listExpenses(userId: string, input: unknown) {
     if (!match) {
       return {
         month,
-        amountUnit: 'cents',
+        amountUnit: 'dollars',
         categoryQueried: category,
         count: 0,
         expenses: [],
@@ -108,13 +117,13 @@ export async function listExpenses(userId: string, input: unknown) {
 
   return {
     month,
-    amountUnit: 'cents',
+    amountUnit: 'dollars',
     categoryQueried: category ?? null,
     count: expenses.length,
     expenses: expenses.map((e) => ({
       date: e.date.toISOString(),
       name: e.name,
-      amount: e.amount,
+      amount: dollars(e.amount),
       category: e.category?.name ?? 'Uncategorized',
     })),
   };
@@ -127,7 +136,7 @@ export const chatbotToolManifest = [
   {
     name: 'get_month_breakdown',
     description:
-      'Full breakdown of income and expenses for any month (past or present): totals, net, and per-category amounts with percentages.',
+      'Full breakdown of income and expenses for any month (past or present): totals, net, and per-category amounts with percentages. All amounts are dollars.',
     params: {
       year: 'number — required',
       month: 'number 1-12 — required',
@@ -136,7 +145,7 @@ export const chatbotToolManifest = [
   {
     name: 'list_expenses',
     description:
-      'Individual expense transactions for a month, newest first. Optionally filtered by category name.',
+      'Individual expense transactions for a month, newest first. Optionally filtered by category name. All amounts are dollars.',
     params: {
       month: 'YYYY-MM string — required',
       category: 'category name — optional',

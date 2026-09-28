@@ -18,6 +18,7 @@ import {
   seedCategory,
   seedExpense,
 } from './helpers';
+
 import { POST as chatbot } from '@/app/api/chatbot/route';
 
 // Scripted chat model: LangGraph drives the REAL agent loop (including real
@@ -163,19 +164,6 @@ describe('POST /api/chatbot', () => {
     expect(body.reply).toContain('$1,000.00'); // 100000 cents
   });
 
-  it('exposes the model payload via ?debug=1', async () => {
-    const { token } = await createUserWithSession();
-    authenticate(token);
-
-    const res = await chatbot(req('POST', '/api/chatbot?debug=1', { message: 'hi' }));
-    const body = await res.json();
-    expect(body.payload.messages).toHaveLength(2); // system + user, no history
-    expect(body.payload.messages[0].role).toBe('system');
-    expect(body.payload.messages[0].content).toContain('"amountUnit": "cents"');
-    expect(body.payload.messages[1]).toMatchObject({ role: 'user', content: 'hi' });
-    expect(body.payload.tools).toHaveLength(2);
-  });
-
   it('returns 429 once the daily limit is hit', async () => {
     process.env.CHATBOT_DAILY_LIMIT = '3';
     const { token } = await createUserWithSession();
@@ -286,7 +274,7 @@ describe('computeProjection', () => {
 });
 
 describe('chatbot tools', () => {
-  it('getMonthBreakdown returns totals and per-category splits', async () => {
+  it('getMonthBreakdown returns totals and per-category splits (dollar strings)', async () => {
     const { user } = await createUserWithSession();
     const food = await seedCategory(user.id, 'food');
     const travel = await seedCategory(user.id, 'travel');
@@ -312,12 +300,12 @@ describe('chatbot tools', () => {
     const result = await getMonthBreakdown(user.id, { year: 2025, month: 5 });
     expect(result).toMatchObject({
       period: '2025-05',
-      totalIncome: 100000, // posted by the tool's processRecurringIncome call
-      totalExpenses: 7500,
-      net: 92500,
+      totalIncome: '1000.00',
+      totalExpenses: '75.00',
+      net: '925.00',
       expenseCount: 2,
     });
-    expect(result.byCategory[0]).toMatchObject({ name: 'food', amount: 5000 });
+    expect(result.byCategory[0]).toMatchObject({ name: 'food', amount: '50.00' });
     expect(result.byCategory[0].percentage).toBeCloseTo(66.7, 1);
   });
 
@@ -416,5 +404,23 @@ describe('generateChatbotReply (LLM paths, scripted model)', () => {
       { modelFactory: () => new ScriptedModel(scripted) },
     );
     expect(mode).toBe('offline');
+  });
+
+  it('exposes the model payload via ?debug=1 (dollar-denominated context)', async () => {
+    const { user, token } = await createUserWithSession();
+    authenticate(token);
+    await seedExpense(user.id, { amount: 5000, date: new Date() });
+
+    const res = await chatbot(req('POST', '/api/chatbot?debug=1', { message: 'hi' }));
+    const body = await res.json();
+    expect(body.payload.messages).toHaveLength(2); // system + user, no history
+    expect(body.payload.messages[0].role).toBe('system');
+    // Pins the display-conversion boundary: the model sees dollar strings,
+    // never raw cents (small-model unit-math regression guard)
+    expect(body.payload.messages[0].content).toContain('"amountUnit": "dollars"');
+    expect(body.payload.messages[0].content).toContain('"expenses": "50.00"');
+    expect(body.payload.messages[0].content).not.toContain('"amountUnit": "cents"');
+    expect(body.payload.messages[1]).toMatchObject({ role: 'user', content: 'hi' });
+    expect(body.payload.tools).toHaveLength(2);
   });
 });

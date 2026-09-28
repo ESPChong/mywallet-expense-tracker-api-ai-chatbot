@@ -1,25 +1,29 @@
-// Formatting - All amounts are integer cents; formatting happens here and nowhere else.
+// ── Money ────────────────────────────────────────────────────────────────
+// All amounts are integer minor units (1/100); formatting happens exactly
+// here, nowhere else. App-wide currency.
 
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-const usdCompact = new Intl.NumberFormat('en-US', {
+export const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY ?? 'HKD';
+
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: CURRENCY });
+const moneyCompact = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'USD',
+  currency: CURRENCY,
   maximumFractionDigits: 0,
 });
 
-/** 4999 → "$49.99"; -7500 → "-$75.00" */
+/** 4999 → "HK$49.99"; -7500 → "-HK$75.00" */
 export function formatCents(cents: number): string {
-  return usd.format(cents / 100);
+  return money.format(cents / 100);
 }
 
-/** Compact form for chart labels: 125000 → "$1,250" */
+/** Compact form for chart labels: 125000 → "HK$1,250" */
 export function formatCentsCompact(cents: number): string {
-  return usdCompact.format(cents / 100);
+  return moneyCompact.format(cents / 100);
 }
 
-/** Signed form for net/delta values: 92500 → "+$925.00"; -2500 → "-$25.00" */
+/** Signed form for net/delta values: 92500 → "+HK$925.00"; -2500 → "-HK$25.00" */
 export function formatSignedCents(cents: number): string {
-  return `${cents < 0 ? '-' : '+'}${usd.format(Math.abs(cents) / 100)}`;
+  return `${cents < 0 ? '-' : '+'}${money.format(Math.abs(cents) / 100)}`;
 }
 
 // ── Dates (UTC everywhere — matches the API's month boundaries) ──────────

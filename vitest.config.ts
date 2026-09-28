@@ -10,6 +10,9 @@ export default defineConfig({
     env: { TZ: 'UTC' },
     fileParallelism: false,
   },
+  css: {
+    postcss: {},
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
