@@ -90,7 +90,10 @@ export function ChatbotDrawer() {
         <Sparkles className="h-5 w-5" />
       </SheetTrigger>
 
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col gap-0 p-0 sm:max-w-md [&>button]:translate-y-1"
+      >
         <SheetHeader className="border-b">
           <SheetTitle className="flex items-center gap-2 text-base">
             <Sparkles className="text-primary h-4 w-4" />
@@ -104,7 +107,7 @@ export function ChatbotDrawer() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="ml-auto h-7 w-7"
+                className="mr-6 ml-auto h-7 w-7"
                 aria-label="Clear conversation"
                 onClick={() => setMessages([])}
               >
