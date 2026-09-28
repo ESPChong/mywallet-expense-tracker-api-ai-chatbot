@@ -25,6 +25,10 @@ function currentPeriod() {
   };
 }
 
+function toMonthString(d: Date) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 describe('GET /api/dashboard', () => {
   it('aggregates summary, category breakdown and recent activity', async () => {
     const { user, token } = await createUserWithSession();
@@ -98,5 +102,41 @@ describe('GET /api/dashboard', () => {
     authenticate(token);
     expect((await getDashboard(req('GET', '/api/dashboard?month=2025-13'))).status).toBe(400);
     expect((await getDashboard(req('GET', '/api/dashboard?month=banana'))).status).toBe(400);
+  });
+});
+
+describe('processRecurringIncome guards (retroactive-posting regression)', () => {
+  it('never posts for months before the template existed', async () => {
+    const { user, token } = await createUserWithSession();
+    authenticate(token);
+    await prisma.income.create({
+      data: { amount: 100000, dayOfMonth: 1, userId: user.id }, // createdAt = now
+    });
+
+    const res = await getDashboard(req('GET', '/api/dashboard?month=2020-01'));
+    expect(res.status).toBe(200); // guards against a vacuous pass — the request must reach the service
+
+    expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(0);
+  });
+
+  it('back-fills every period from creation through the requested month', async () => {
+    const { user, token } = await createUserWithSession();
+    authenticate(token);
+    const now = new Date();
+    await prisma.income.create({
+      data: {
+        amount: 50000,
+        dayOfMonth: 1,
+        userId: user.id,
+        createdAt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, 1)),
+      },
+    });
+
+    const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const res = await getDashboard(req('GET', `/api/dashboard?month=${toMonthString(target)}`));
+    expect(res.status).toBe(200);
+
+    // creation month, the following month, and the requested month
+    expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(3);
   });
 });

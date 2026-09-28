@@ -64,3 +64,13 @@ export function addMonths(month: string, delta: number): string {
   const d = new Date(Date.UTC(year, mon - 1 + delta, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
+
+/** 1 → "1st", 2 → "2nd", 21 → "21st", 11 → "11th" */
+export function ordinalDay(day: number): string {
+  const rem10 = day % 10;
+  const rem100 = day % 100;
+  if (rem10 === 1 && rem100 !== 11) return `${day}st`;
+  if (rem10 === 2 && rem100 !== 12) return `${day}nd`;
+  if (rem10 === 3 && rem100 !== 13) return `${day}rd`;
+  return `${day}th`;
+}

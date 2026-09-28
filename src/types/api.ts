@@ -58,3 +58,14 @@ export interface ExpenseListResponse {
   data: Expense[];
   pagination: Pagination;
 }
+
+export interface Income {
+  id: string;
+  name: string | null;
+  amount: number;
+  dayOfMonth: number;
+  createdAt: string;
+  active: boolean;
+  lastPostedPeriod: string | null;
+  userId: string;
+}

@@ -11,8 +11,10 @@ export function useDashboard(month: string) {
   return useQuery({
     queryKey: dashboardKeys.month(month),
     queryFn: () => api<DashboardData>(`/api/dashboard?month=${month}`),
-    // keepPreviousData: switching months shows last month's numbers dimmed
-    // while the new ones load — no skeleton flash between months
     placeholderData: keepPreviousData,
+    // Overrides the global 15s staleTime: this GET has side effects (lazy
+    // recurring-income posting), so a cached totalSavings can be stale the
+    // moment another month's fetch posted new entries.
+    staleTime: 0,
   });
 }

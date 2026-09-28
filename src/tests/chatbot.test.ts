@@ -239,7 +239,14 @@ describe('chatbot tools', () => {
       categoryId: travel.id,
       date: new Date(Date.UTC(2025, 4, 20)),
     });
-    await prisma.income.create({ data: { amount: 100000, dayOfMonth: 1, userId: user.id } });
+    await prisma.income.create({
+      data: {
+        amount: 100000,
+        dayOfMonth: 1,
+        userId: user.id,
+        createdAt: new Date(Date.UTC(2025, 3, 1)), // backdate: template existed before May 2025
+      },
+    });
 
     const result = await getMonthBreakdown(user.id, { year: 2025, month: 5 });
     expect(result).toMatchObject({

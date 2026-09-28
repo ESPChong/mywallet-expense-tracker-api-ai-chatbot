@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Real validation (is it valid?) happens in (app)/layout.tsx via getCurrentUser().
 const PUBLIC_PATHS = ['/login', '/register', '/about'];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // NOTE: Do NOT redirect /login → / when a cookie exists
