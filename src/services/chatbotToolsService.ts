@@ -17,10 +17,7 @@ export const listExpensesParams = z.object({
 
 // ── Tool implementations: scoped to userId, return plain JSON ──
 
-export async function getMonthBreakdown(
-  userId: string,
-  input: z.infer<typeof getMonthBreakdownParams>,
-) {
+export async function getMonthBreakdown(userId: string, input: unknown) {
   const { year, month } = getMonthBreakdownParams.parse(input);
 
   // Same idempotent side effect as /api/dashboard, so current-month breakdowns
@@ -69,7 +66,7 @@ export async function getMonthBreakdown(
   };
 }
 
-export async function listExpenses(userId: string, input: z.input<typeof listExpensesParams>) {
+export async function listExpenses(userId: string, input: unknown) {
   const { month, category, limit } = listExpensesParams.parse(input);
   const [year, mon] = month.split('-').map(Number);
   const start = new Date(Date.UTC(year, mon - 1, 1));

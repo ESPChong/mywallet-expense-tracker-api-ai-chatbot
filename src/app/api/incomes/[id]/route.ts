@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { objectIdSchema, incomeUpdateSchema } from '@/lib/validations';
+import { materializeUserIncomeSafe } from '@/services/incomeService';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -70,6 +71,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const income = await prisma.income.update({ where: { id }, data });
+
+    await materializeUserIncomeSafe(user.id);
+
     return NextResponse.json(income);
   } catch (error) {
     console.error('Update Income Error:', error);

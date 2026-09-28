@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
+import { categoryCreateSchema } from '@/lib/validations';
+import { apiError } from '@/lib/api-response';
 
-// GET /api/categories
-export async function GET() {
+export async function GET(_request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) return apiError(401, 'Unauthorized');
 
     const categories = await prisma.category.findMany({
       where: { userId: user.id },
@@ -15,39 +16,27 @@ export async function GET() {
     return NextResponse.json({ data: categories });
   } catch (error) {
     console.error('List Categories Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return apiError(500, 'Internal Server Error');
   }
 }
 
-// POST /api/categories
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!user) return apiError(401, 'Unauthorized');
 
-    const body = await request.json();
-    const { name } = body;
-
-    if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
-    }
+    const result = categoryCreateSchema.safeParse(await request.json());
+    if (!result.success) return apiError(400, 'Validation failed', result.error.issues);
 
     const category = await prisma.category.create({
-      data: {
-        name,
-        userId: user.id,
-      },
+      data: { name: result.data.name, userId: user.id },
     });
-
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
-    // Handles Prisma unique constraint violation (duplicate category name per user)
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
-      return NextResponse.json({ error: 'Category name already exists' }, { status: 409 });
+    if ((error as { code?: string }).code === 'P2002') {
+      return apiError(409, 'Category name already exists');
     }
     console.error('Create Category Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return apiError(500, 'Internal Server Error');
   }
 }

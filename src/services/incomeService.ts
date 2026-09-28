@@ -83,3 +83,17 @@ export async function processRecurringIncome(userId: string, year: number, month
     }
   }
 }
+
+export async function materializeUserIncome(userId: string): Promise<void> {
+  const now = new Date();
+  await processRecurringIncome(userId, now.getUTCFullYear(), now.getUTCMonth() + 1);
+}
+
+/** Non-fatal variant for route handlers — never breaks the host operation. */
+export async function materializeUserIncomeSafe(userId: string): Promise<void> {
+  try {
+    await materializeUserIncome(userId);
+  } catch (error) {
+    console.error('Income materialization failed (non-fatal):', error);
+  }
+}

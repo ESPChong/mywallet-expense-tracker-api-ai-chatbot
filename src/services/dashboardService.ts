@@ -1,12 +1,8 @@
 import { prisma } from '@/lib/prisma';
-import { processRecurringIncome } from './incomeService';
 
 // Main service function to assemble dashboard data
 export async function getDashboardData(userId: string, year: number, month: number) {
   const periodString = `${year}-${String(month).padStart(2, '0')}`;
-
-  // Process recurring income before fetching data
-  await processRecurringIncome(userId, year, month);
 
   // Define date boundaries for the target month
   const startDate = new Date(year, month - 1, 1);

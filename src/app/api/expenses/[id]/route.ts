@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { objectIdSchema, expenseUpdateSchema } from '@/lib/validations';
+import { materializeUserIncomeSafe } from '@/services/incomeService';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -86,6 +87,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       data,
       include: CATEGORY_INCLUDE,
     });
+
+    await materializeUserIncomeSafe(user.id);
+
     return NextResponse.json(expense);
   } catch (error) {
     console.error('Update Expense Error:', error);
@@ -111,6 +115,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     if (!existing) return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
 
     await prisma.expense.delete({ where: { id } });
+
+    await materializeUserIncomeSafe(user.id);
+
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('Delete Expense Error:', error);

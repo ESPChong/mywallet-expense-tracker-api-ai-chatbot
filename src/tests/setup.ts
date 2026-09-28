@@ -1,4 +1,4 @@
-import { beforeEach } from 'vitest';
+import { beforeEach, afterAll } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import { resetRateLimiter } from '@/lib/rateLimit';
 import { cookieStore } from './mocks/next-headers';
@@ -23,4 +23,8 @@ beforeEach(async () => {
   await prisma.session.deleteMany();
   await prisma.user.deleteMany();
   cookieStore.clear();
+});
+
+afterAll(async () => {
+  await prisma.$disconnect();
 });

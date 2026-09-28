@@ -11,6 +11,13 @@ info:
     - Include the cookie in subsequent requests
     - Use the `/api/me` endpoint to verify authentication status
 
+    ## Rate limiting
+    - `POST /api/auth/login`: 10 attempts / 15 min per email AND 30 / 15 min per IP
+      (successful login resets the email bucket)
+    - `POST /api/auth/register`: 10 / 15 min per IP
+    - `POST /api/chatbot`: 50 messages / user / UTC day
+    - Limited endpoints return 429; auth endpoints include a `Retry-After` header
+
     ## Conventions
     - **Money:** all amounts are integers in **cents** (e.g. `4999` = $49.99)
     - **IDs:** MongoDB ObjectIds — 24-character hexadecimal strings
@@ -19,10 +26,19 @@ info:
       resource exists for someone else
     - **Dates:** accepted as `YYYY-MM-DD` or full ISO 8601 datetime strings;
       always returned as ISO 8601 datetimes
+    - **Errors:** every error response uses the same envelope:
+      `{ success: false, error, details? }`
     - **Recurring income:** `Income` objects are templates. Their `IncomeEntry`
-      postings are generated automatically by the server (see `/api/dashboard`)
-      and are never created or edited directly through this API
-  version: 1.1.0
+      postings are generated automatically by the server — materialized on
+      login and on expense/income mutations (and before chatbot analysis).
+      `GET /api/dashboard` is a pure read and never creates postings.
+      Postings never predate a template's creation (`createdAt`): viewing or
+      materializing an earlier month does not invent income history, and any
+      missing periods between creation and the current period are back-filled
+      automatically. Postings are never created or edited directly through
+      this API
+
+  version: 1.2.0
   contact:
     name: Corrin
     url: https://github.com/ESPChong/personal-expense-tracker-with-chatbot-analyst
@@ -49,11 +65,32 @@ tags:
     description: Expense category management
   - name: Dashboard
     description: Aggregated monthly analytics
+  - name: Chatbot
+    description: AI analyst over the user's financial data
   - name: Client
     description: Frontend page routes
 
 paths:
   # Client Routes
+  /:
+    get:
+      tags: [Client]
+      summary: Get dashboard page
+      description: Returns the monthly analytics dashboard for authenticated users.
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Dashboard rendered successfully
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /about:
     get:
       tags: [Client]
@@ -99,24 +136,24 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-    /logout:
-      get:
-        tags: [Client]
-        summary: Get logout confirmation page
-        description: Returns the logout confirmation page for authenticated users.
-        security:
-          - sessionAuth: []
-        responses:
-          '200':
-            description: Logout confirmation page rendered successfully.
-            content:
-              text/html:
-                schema:
-                  type: string
-          '401':
-            $ref: '#/components/responses/Unauthorized'
-          '500':
-            $ref: '#/components/responses/InternalServerError'
+  /logout:
+    get:
+      tags: [Client]
+      summary: Get logout confirmation page
+      description: Returns the logout confirmation page for authenticated users.
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Logout confirmation page rendered successfully.
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /expenses:
     get:
@@ -128,6 +165,44 @@ paths:
       responses:
         '200':
           description: Expenses dashboard rendered successfully
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /incomes:
+    get:
+      tags: [Client]
+      summary: Get incomes page
+      description: Returns the recurring income management page for authenticated users.
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Incomes page rendered successfully
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /categories:
+    get:
+      tags: [Client]
+      summary: Get categories page
+      description: Returns the category management page for authenticated users.
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Categories page rendered successfully
           content:
             text/html:
               schema:
@@ -151,6 +226,7 @@ paths:
         - Emails are normalized to lowercase before storage
         - Passwords are hashed with bcrypt (12 rounds)
         - The session token is stored server-side as a SHA-256 hash
+        - Rate limited per IP (see Rate limiting in the API description)
       requestBody:
         required: true
         content:
@@ -187,6 +263,21 @@ paths:
               example:
                 success: false
                 error: User with this email already exists
+        '429':
+          description: Too many registrations from this network
+          headers:
+            Retry-After:
+              description: Seconds until the rate-limit window resets
+              schema:
+                type: integer
+                example: 897
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: Too many registrations from this network. Please try again later.
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -200,6 +291,9 @@ paths:
         - Email matching is case-insensitive
         - Returns the same generic error for unknown emails and wrong
           passwords (no user enumeration)
+        - Rate limited per email AND per IP; a successful login resets the
+          email bucket (see Rate limiting in the API description)
+        - Due recurring income entries are materialized on successful login
       requestBody:
         required: true
         content:
@@ -235,6 +329,21 @@ paths:
               example:
                 success: false
                 error: Invalid credentials
+        '429':
+          description: Too many attempts
+          headers:
+            Retry-After:
+              description: Seconds until the rate-limit window resets
+              schema:
+                type: integer
+                example: 743
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: Too many attempts. Please try again later.
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -328,6 +437,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
+                success: false
                 error: Category name already exists
         '500':
           $ref: '#/components/responses/InternalServerError'
@@ -398,6 +508,9 @@ paths:
         If `categoryId` is provided it must reference one of *this user's*
         categories — otherwise the request is rejected with 400 (this
         prevents linking another user's category).
+
+        Creating an expense also materializes any due recurring income
+        entries (see Conventions).
       security:
         - sessionAuth: []
       requestBody:
@@ -465,6 +578,9 @@ paths:
 
         Set `categoryId` to `null` to explicitly remove the expense's category.
         A provided `categoryId` (non-null) must belong to the requesting user.
+
+        Updating an expense also materializes any due recurring income
+        entries (see Conventions).
       security:
         - sessionAuth: []
       requestBody:
@@ -495,7 +611,9 @@ paths:
     delete:
       tags: [Expenses]
       summary: Delete an expense
-      description: Permanently deletes an expense owned by the authenticated user.
+      description: |
+        Permanently deletes an expense owned by the authenticated user.
+        Deleting also materializes any due recurring income entries.
       security:
         - sessionAuth: []
       responses:
@@ -517,7 +635,7 @@ paths:
     get:
       tags: [Incomes]
       summary: List recurring income templates
-      description: Returns the authenticated user's recurring income templates, active ones first.
+      description: A newly created template only generates postings from its creation period onward — it never back-fills months before it existed.
       security:
         - sessionAuth: []
       responses:
@@ -537,8 +655,8 @@ paths:
       summary: Create a recurring income template
       description: |
         Creates a recurring income template. The server automatically posts an
-        `IncomeEntry` each period once the income's `dayOfMonth` has passed
-        (see `/api/dashboard`).
+        `IncomeEntry` each period once the income's `dayOfMonth` has passed —
+        creation itself immediately materializes any already-due postings.
 
         `dayOfMonth` values above a month's length are capped to that month's
         last day (e.g. `31` posts on Feb 28).
@@ -609,6 +727,8 @@ paths:
 
         To stop a recurring income while preserving its history, set
         `active: false` (soft delete) rather than using DELETE.
+
+        Updating also materializes any due recurring income entries.
       security:
         - sessionAuth: []
       requestBody:
@@ -640,7 +760,7 @@ paths:
       tags: [Incomes]
       summary: Delete a recurring income template
       description: |
-        Note: Permanently deletes the template **and all of its historical income
+        ⚠️ Permanently deletes the template **and all of its historical income
         entries**, which changes all-time savings calculations. To preserve
         history, use `PATCH { "active": false }` instead.
       security:
@@ -668,9 +788,9 @@ paths:
         Returns monthly analytics: summary metrics, spending breakdown by
         category, and recent activity. Defaults to the current month.
 
-        **Side effect:** before aggregating, the server posts any due
-        recurring income entries for the requested period. This operation is
-        idempotent — entries are posted exactly once per period.
+        A **pure read** — this endpoint never creates recurring income
+        postings. Postings are materialized on login and on expense/income
+        mutations (see Conventions).
       security:
         - sessionAuth: []
       parameters:
@@ -693,6 +813,80 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ------------------------------------------------------------------------
+
+  # Chatbot Route
+  /api/chatbot:
+    post:
+      tags: [Chatbot]
+      summary: Ask the AI analyst a question
+      description: |
+        Sends a message to the LLM-powered analyst and returns its reply.
+
+        - A fresh financial context (current month, trailing 6 months,
+          projection, active incomes) is built server-side on every request —
+          the client never sends financial data
+        - The model may call whitelisted, user-scoped tools
+          (`get_month_breakdown`, `list_expenses`) to answer historical
+          drill-down questions
+        - Before building context, due recurring income entries are
+          materialized (idempotent)
+        - If the LLM provider is unavailable, the endpoint degrades to a
+          deterministic data summary and returns `mode: "offline"` (still 200)
+        - With `?debug=1`, the response includes `payload`: the exact JSON
+          that was sent to the model
+        - Rate limited to 50 messages per user per UTC day
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatbotRequest'
+            examples:
+              simple:
+                value:
+                  message: How am I doing this month?
+              withMonth:
+                value:
+                  message: Where is my money going?
+                  month: '2025-06'
+      responses:
+        '200':
+          description: Analyst reply (or offline summary)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatbotResponse'
+              examples:
+                llm:
+                  summary: Normal LLM reply
+                  value:
+                    reply: 'This month: income $1,000.00, expenses $75.00, net $925.00.'
+                    mode: llm
+                offline:
+                  summary: LLM provider unreachable — deterministic summary
+                  value:
+                    reply: '(offline mode — analyst unavailable) Summary for 2025-06: …'
+                    mode: offline
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          description: Daily message limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: Daily message limit exceeded
+                resetAt: '2025-06-19T00:00:00.000Z'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -803,9 +997,9 @@ components:
     ErrorResponse:
       type: object
       description: |
-        Error envelope. Auth endpoints wrap errors with `success: false`;
-        resource endpoints (expenses, incomes, categories, dashboard) return
-        only `error`, plus `details` on validation failures.
+        Canonical error envelope — every error response in the API uses this
+        shape. `details` (Zod issue objects) is present only on validation
+        failures.
       properties:
         success:
           type: boolean
@@ -818,7 +1012,12 @@ components:
           description: Present on validation failures (Zod issue objects)
           items:
             $ref: '#/components/schemas/ZodIssue'
+        resetAt:
+          type: string
+          format: date-time
+          description: Only on chatbot 429s — when the daily limit resets
       required:
+        - success
         - error
 
     ZodIssue:
@@ -881,6 +1080,7 @@ components:
         name:
           type: string
           minLength: 1
+          maxLength: 100
           description: Category name (unique per user)
           example: hobbies
       required:
@@ -1186,6 +1386,66 @@ components:
           items:
             $ref: '#/components/schemas/RecentActivity'
 
+    ChatbotTurn:
+      type: object
+      description: A prior conversation turn sent back by the client
+      properties:
+        role:
+          type: string
+          enum:
+            - user
+            - assistant
+        content:
+          type: string
+          maxLength: 2000
+      required:
+        - role
+        - content
+
+    ChatbotRequest:
+      type: object
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: The user's question
+          example: How am I doing this month?
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: Target month for the analysis context (YYYY-MM). Defaults to the current month.
+          example: '2025-06'
+        history:
+          type: array
+          maxItems: 10
+          description: Up to 10 prior turns for conversational context
+          items:
+            $ref: '#/components/schemas/ChatbotTurn'
+      required:
+        - message
+
+    ChatbotResponse:
+      type: object
+      properties:
+        reply:
+          type: string
+          description: The analyst's reply (markdown — tables for breakdowns)
+        mode:
+          type: string
+          enum:
+            - llm
+            - offline
+          description: |
+            `llm` — generated by the model. `offline` — the LLM provider was
+            unreachable and this is a deterministic summary built from live data.
+        payload:
+          type: object
+          description: 'Present only with ?debug=1 — the exact JSON sent to the model'
+      required:
+        - reply
+        - mode
+
   responses:
     Unauthorized:
       description: Authentication required or invalid session
@@ -1193,16 +1453,9 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            authStyle:
-              summary: Auth endpoints (/api/me, /api/auth/*)
-              value:
-                success: false
-                error: Not authenticated
-            crudStyle:
-              summary: Resource endpoints (expenses, incomes, categories, dashboard)
-              value:
-                error: Unauthorized
+          example:
+            success: false
+            error: Unauthorized
 
     BadRequest:
       description: |
@@ -1217,6 +1470,7 @@ components:
             validation:
               summary: Validation failure with details
               value:
+                success: false
                 error: Validation failed
                 details:
                   - code: invalid_format
@@ -1226,6 +1480,7 @@ components:
             invalidReference:
               summary: Referenced resource not owned by the user
               value:
+                success: false
                 error: Category not found
 
     NotFound:
@@ -1237,6 +1492,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
+            success: false
             error: Expense not found
 
     Conflict:
@@ -1246,6 +1502,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
+            success: false
             error: Category name already exists
 
     InternalServerError:
@@ -1255,4 +1512,5 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
+            success: false
             error: Internal Server Error

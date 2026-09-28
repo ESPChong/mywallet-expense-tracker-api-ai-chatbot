@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { incomeCreateSchema } from '@/lib/validations';
+import { materializeUserIncomeSafe } from '@/services/incomeService';
 
 function unauthorized() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -42,6 +43,9 @@ export async function POST(request: NextRequest) {
     const income = await prisma.income.create({
       data: { name: name ?? null, amount, dayOfMonth, active: true, userId: user.id },
     });
+
+    await materializeUserIncomeSafe(user.id);
+
     return NextResponse.json(income, { status: 201 });
   } catch (error) {
     console.error('Create Income Error:', error);

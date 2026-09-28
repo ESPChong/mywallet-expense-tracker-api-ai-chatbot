@@ -5,7 +5,8 @@ import { resetRateLimiter } from '@/lib/rateLimit';
 import { buildChatbotContext, computeProjection } from '@/services/chatbotContextService';
 import { getMonthBreakdown, listExpenses } from '@/services/chatbotToolsService';
 import { AIMessage, type BaseMessage } from '@langchain/core/messages';
-import { BaseChatModel, type ChatResult } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { ChatResult } from '@langchain/core/outputs';
 import type { ChatbotContext } from '@/services/chatbotContextService';
 import { generateChatbotReply, OFFLINE_MODE_PREFIX } from '@/services/chatbotService';
 
@@ -40,6 +41,9 @@ class ScriptedModel extends BaseChatModel {
 }
 
 class ThrowingModel extends BaseChatModel {
+  constructor() {
+    super({});
+  }
   _llmType() {
     return 'throwing';
   }

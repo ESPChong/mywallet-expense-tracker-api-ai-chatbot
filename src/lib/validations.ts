@@ -74,6 +74,12 @@ export const incomeUpdateSchema = incomeCreateSchema.partial().extend({
   active: z.boolean().optional(),
 });
 
+// -------- categories ---------
+
+export const categoryCreateSchema = z.object({
+  name: z.string().trim().min(1, 'Category name is required').max(100, 'Category name is too long'),
+});
+
 // ---------- chatbot ----------
 
 export const chatbotRequestSchema = z.object({

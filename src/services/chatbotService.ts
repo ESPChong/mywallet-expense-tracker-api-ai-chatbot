@@ -6,11 +6,16 @@ import {
   listExpenses,
   listExpensesParams,
 } from './chatbotToolsService';
-import { isAIMessage, type BaseMessage } from '@langchain/core/messages';
+import {
+  AIMessage,
+  HumanMessage,
+  SystemMessage,
+  ToolMessage,
+  type BaseMessage,
+} from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOllama } from '@langchain/ollama';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
-import { tool } from '@langchain/core/tools';
+import { tool, type StructuredToolInterface } from '@langchain/core/tools';
 import { z } from 'zod';
 
 export interface ChatTurn {
@@ -39,7 +44,6 @@ USER FINANCIAL DATA (JSON):
  ${JSON.stringify(context, null, 2)}`;
 }
 
-// The exact JSON handed to the model; returned by the route when ?debug=1
 export function buildModelPayload(args: {
   context: ChatbotContext;
   history: ChatTurn[];
@@ -108,8 +112,9 @@ function createDefaultModel(): BaseChatModel {
 
 // Tools are built per request and close over userId — every tool execution is
 // ownership-scoped, exactly like the HTTP routes. Never module singletons.
-// ⚠️ If your @langchain/core version rejects the Zod 4 schema here, replace
-// `schema: X` with `schema: X.toJSONSchema()` — same runtime behavior.
+// lcTools: model-facing definitions (name/description/schema for bindTools).
+// executors: our own execution path — args are zod-parsed inside the service
+// functions, so raw model output is validated before it touches the DB.
 function createChatbotTools(userId: string) {
   const monthBreakdown = tool(
     async (input: z.input<typeof getMonthBreakdownParams>) =>
@@ -131,17 +136,80 @@ function createChatbotTools(userId: string) {
     },
   );
 
-  return [monthBreakdown, list];
+  const lcTools: StructuredToolInterface[] = [monthBreakdown, list];
+
+  const executors: Record<string, (args: unknown) => Promise<string>> = {
+    get_month_breakdown: async (args) => JSON.stringify(await getMonthBreakdown(userId, args)),
+    list_expenses: async (args) => JSON.stringify(await listExpenses(userId, args)),
+  };
+
+  return { lcTools, executors };
 }
 
-// Last AI message with actual text content — skips tool-call-only messages
+// Plain {role, content} → real message instances. Version-stable, no reliance
+// on LangGraph's coercion of plain objects.
+function toMessages(payload: ChatbotModelPayload): BaseMessage[] {
+  return payload.messages.map((m) => {
+    if (m.role === 'system') return new SystemMessage(m.content);
+    if (m.role === 'assistant') return new AIMessage(m.content);
+    return new HumanMessage(m.content);
+  });
+}
+
+// Last AI message with actual text — skips tool-call-only messages.
+// instanceof replaces the deprecated isAIMessage guard.
 function extractReply(messages: BaseMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (!isAIMessage(m)) continue;
+    if (!(m instanceof AIMessage)) continue;
     if (typeof m.content === 'string' && m.content.trim()) return m.content.trim();
   }
   return null;
+}
+
+// Hard cap: a confused model must not spin forever.
+const MAX_MODEL_CALLS = 6;
+
+/**
+ * Minimal ReAct loop, built only on stable @langchain/core primitives:
+ * model call → tool calls? → execute → feed results back → repeat, until the
+ * model answers in plain text or the call cap is hit.
+ */
+async function runToolLoop(
+  model: BaseChatModel,
+  lcTools: StructuredToolInterface[],
+  executors: Record<string, (args: Record<string, unknown>) => Promise<string>>,
+  messages: BaseMessage[],
+): Promise<BaseMessage[]> {
+  // bindTools is optional on BaseChatModel — models without tool support run
+  // answer-only (context still grounds them); ChatOllama implements it.
+  const boundModel = model.bindTools ? model.bindTools(lcTools) : model;
+  const history = [...messages];
+
+  for (let call = 0; call < MAX_MODEL_CALLS; call++) {
+    const ai = (await boundModel.invoke(history)) as AIMessage;
+    history.push(ai);
+
+    const toolCalls = ai.tool_calls ?? [];
+    if (toolCalls.length === 0) return history; // final answer
+
+    for (const tc of toolCalls) {
+      const execute = executors[tc.name];
+      let output: string;
+      if (execute) {
+        try {
+          output = await execute(tc.args);
+        } catch (error) {
+          console.error(`Chatbot tool ${tc.name} failed:`, error);
+          output = JSON.stringify({ error: 'Tool execution failed' });
+        }
+      } else {
+        output = JSON.stringify({ error: `Unknown tool: ${tc.name}` });
+      }
+      history.push(new ToolMessage({ content: output, tool_call_id: tc.id ?? 'call' }));
+    }
+  }
+  return history; // hit the cap without a final answer → caller falls back
 }
 
 export type ChatbotMode = 'llm' | 'offline';
@@ -163,20 +231,12 @@ export async function generateChatbotReply(
   if (llmEnabled) {
     try {
       const model = deps.modelFactory ? deps.modelFactory() : createDefaultModel();
-      const agent = createReactAgent({
-        llm: model,
-        tools: createChatbotTools(args.user.id),
-        prompt: payload.messages[0].content, // system prompt
-      });
-      const result = await agent.invoke(
-        { messages: payload.messages.slice(1) }, // history + user message
-        { recursionLimit: 8 }, // hard cap: ~4 model+tool round trips
-      );
-      const reply = extractReply((result.messages ?? []) as BaseMessage[]);
+      const { lcTools, executors } = createChatbotTools(args.user.id);
+      const resultMessages = await runToolLoop(model, lcTools, executors, toMessages(payload));
+      const reply = extractReply(resultMessages);
       if (reply) return { reply, mode: 'llm', payload };
-      // Model ended without a final text message → fall through to offline
+      // Model ended without final text → fall through to offline
     } catch (error) {
-      // Ollama down / model missing / agent loop failure → degrade, never 500
       console.error('Chatbot LLM error — falling back to offline mode:', error);
     }
   }

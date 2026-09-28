@@ -23,8 +23,6 @@ const SUGGESTED_QUESTIONS = [
   'What will I end the month at?',
 ];
 
-const isOffline = messages.some((m) => m.offline);
-
 export function ChatbotDrawer() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,6 +30,8 @@ export function ChatbotDrawer() {
   const [isPending, setIsPending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isOffline = messages.some((m) => m.offline);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();

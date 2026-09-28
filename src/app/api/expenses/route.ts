@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { expenseCreateSchema, expenseQuerySchema } from '@/lib/validations';
+import { materializeUserIncomeSafe } from '@/services/incomeService';
 
 const CATEGORY_INCLUDE = { category: { select: { id: true, name: true } } };
 
@@ -85,6 +86,8 @@ export async function POST(request: NextRequest) {
       data: { name, amount, date: new Date(date), categoryId: categoryId ?? null, userId: user.id },
       include: CATEGORY_INCLUDE,
     });
+
+    await materializeUserIncomeSafe(user.id);
 
     return NextResponse.json(expense, { status: 201 });
   } catch (error) {

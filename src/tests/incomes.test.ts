@@ -95,6 +95,16 @@ describe('incomes API', () => {
     expect(await prisma.incomeEntry.count({ where: { incomeId: income.id } })).toBe(0);
   });
 
+  it('materializes due recurring income on template create', async () => {
+    const { user, token } = await createUserWithSession();
+    authenticate(token);
+    await prisma.income.create({ data: { amount: 50000, dayOfMonth: 1, userId: user.id } });
+    // POST /api/incomes with a second template triggers materialization for both
+    const res = await createIncome(req('POST', '/api/incomes', { amount: 100, dayOfMonth: 15 }));
+    expect(res.status).toBe(201);
+    expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(1); // the day-1 template, now due
+  });
+
   it('returns 404 for other users templates', async () => {
     const { token } = await createUserWithSession();
     authenticate(token);

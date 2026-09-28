@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { prisma } from '@/lib/prisma';
+import { processRecurringIncome } from '@/services/incomeService';
 import {
   req,
   createUserWithSession,
@@ -16,17 +17,7 @@ function currentPeriod() {
   const month = now.getUTCMonth() + 1;
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
-  return {
-    year,
-    month,
-    prevYear,
-    prevMonth,
-    current: `${year}-${String(month).padStart(2, '0')}`,
-  };
-}
-
-function toMonthString(d: Date) {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  return { year, month, prevYear, prevMonth, current: `${year}-${String(month).padStart(2, '0')}` };
 }
 
 describe('GET /api/dashboard', () => {
@@ -58,11 +49,13 @@ describe('GET /api/dashboard', () => {
       data: { name: 'Salary', amount: 100000, dayOfMonth: 1, userId: user.id },
     });
 
+    // Materialization is no longer the GET's job — trigger it explicitly
+    await processRecurringIncome(user.id, year, month);
+
     const res = await getDashboard(req('GET', `/api/dashboard?month=${current}`));
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    // 100000 income - 17500 total expenses; month: 100000 income, 7500 expenses
     expect(body.summary).toEqual({
       totalSavings: 82500,
       monthIncome: 100000,
@@ -73,7 +66,6 @@ describe('GET /api/dashboard', () => {
     expect(body.spendingByCategory[0]).toMatchObject({ name: 'food', amount: 5000 });
     expect(body.spendingByCategory[0].percentage).toBeCloseTo(66.67, 1);
 
-    // 3 expenses + 1 posted income entry
     expect(body.recentActivity).toHaveLength(4);
     for (let i = 1; i < body.recentActivity.length; i++) {
       expect(new Date(body.recentActivity[i - 1].date).getTime()).toBeGreaterThanOrEqual(
@@ -86,12 +78,24 @@ describe('GET /api/dashboard', () => {
     const { user, token } = await createUserWithSession();
     authenticate(token);
     await prisma.income.create({ data: { amount: 50000, dayOfMonth: 1, userId: user.id } });
-    const { current } = currentPeriod();
+    const { year, month, current } = currentPeriod();
 
-    await getDashboard(req('GET', `/api/dashboard?month=${current}`));
-    await getDashboard(req('GET', `/api/dashboard?month=${current}`));
+    // Idempotency now lives in the service — call it twice directly
+    await processRecurringIncome(user.id, year, month);
+    await processRecurringIncome(user.id, year, month);
 
     expect(await prisma.incomeEntry.count({ where: { userId: user.id, period: current } })).toBe(1);
+  });
+
+  it('GET does not materialize income postings (pure read)', async () => {
+    const { user, token } = await createUserWithSession();
+    authenticate(token);
+    await prisma.income.create({ data: { amount: 50000, dayOfMonth: 1, userId: user.id } });
+    const { current } = currentPeriod();
+
+    const res = await getDashboard(req('GET', `/api/dashboard?month=${current}`));
+    expect(res.status).toBe(200);
+    expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(0);
   });
 
   it('rejects unauthorized requests and invalid months', async () => {
@@ -107,21 +111,19 @@ describe('GET /api/dashboard', () => {
 
 describe('processRecurringIncome guards (retroactive-posting regression)', () => {
   it('never posts for months before the template existed', async () => {
-    const { user, token } = await createUserWithSession();
-    authenticate(token);
+    const { user } = await createUserWithSession();
     await prisma.income.create({
       data: { amount: 100000, dayOfMonth: 1, userId: user.id }, // createdAt = now
     });
 
-    const res = await getDashboard(req('GET', '/api/dashboard?month=2020-01'));
-    expect(res.status).toBe(200); // guards against a vacuous pass — the request must reach the service
+    // Direct service call — no HTTP, no auth needed
+    await processRecurringIncome(user.id, 2020, 1);
 
     expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(0);
   });
 
   it('back-fills every period from creation through the requested month', async () => {
-    const { user, token } = await createUserWithSession();
-    authenticate(token);
+    const { user } = await createUserWithSession();
     const now = new Date();
     await prisma.income.create({
       data: {
@@ -133,8 +135,7 @@ describe('processRecurringIncome guards (retroactive-posting regression)', () =>
     });
 
     const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-    const res = await getDashboard(req('GET', `/api/dashboard?month=${toMonthString(target)}`));
-    expect(res.status).toBe(200);
+    await processRecurringIncome(user.id, target.getUTCFullYear(), target.getUTCMonth() + 1);
 
     // creation month, the following month, and the requested month
     expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(3);

@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { registerSchema } from '@/lib/validations';
 import { generateSessionToken, hashSessionToken } from '@/lib/session';
+import { checkWindowRateLimit, envLimit, clientIpFromRequest } from '@/lib/rateLimit';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { DEFAULT_CATEGORIES } from '@/lib/default-category';
+
+const RATE_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +19,23 @@ export async function POST(request: Request) {
       );
     }
     const { name, email, password } = result.data;
+
+    // Rate limit registrations per IP (mass account-creation guard)
+    const ip = clientIpFromRequest(request);
+    const ipCheck = checkWindowRateLimit(
+      `register:ip:${ip}`,
+      envLimit('REGISTER_RATE_LIMIT_IP', 10),
+      RATE_WINDOW_MS,
+    );
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Too many registrations from this network. Please try again later.',
+        },
+        { status: 429, headers: { 'Retry-After': String(Math.max(1, ipCheck.retryAfterSeconds)) } },
+      );
+    }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {

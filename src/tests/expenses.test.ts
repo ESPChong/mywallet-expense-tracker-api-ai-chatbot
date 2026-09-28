@@ -170,4 +170,16 @@ describe('expenses API', () => {
         .status,
     ).toBe(400);
   });
+
+  it('materializes due recurring income on create (mutation side effect)', async () => {
+    const { user, token } = await createUserWithSession();
+    authenticate(token);
+    await prisma.income.create({ data: { amount: 50000, dayOfMonth: 1, userId: user.id } });
+
+    const res = await createExpense(
+      req('POST', '/api/expenses', { name: 'trigger', amount: 100, date: '2025-06-01' }),
+    );
+    expect(res.status).toBe(201);
+    expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(1);
+  });
 });

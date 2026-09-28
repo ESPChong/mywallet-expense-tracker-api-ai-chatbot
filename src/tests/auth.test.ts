@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import { hashSessionToken } from '@/lib/session';
 import { cookieStore } from './mocks/next-headers';
@@ -87,6 +87,17 @@ describe('POST /api/auth/login', () => {
     );
     expect(res.status).toBe(401);
   });
+
+  it('materializes due recurring income on login', async () => {
+    const { user, password } = await createTestUser({ email: 'materialize@test.dev' });
+    await prisma.income.create({ data: { amount: 50000, dayOfMonth: 1, userId: user.id } });
+
+    const res = await loginHandler(
+      req('POST', '/api/auth/login', { email: 'materialize@test.dev', password }),
+    );
+    expect(res.status).toBe(200);
+    expect(await prisma.incomeEntry.count({ where: { userId: user.id } })).toBe(1);
+  });
 });
 
 describe('POST /api/auth/logout', () => {
@@ -114,5 +125,84 @@ describe('GET /api/me', () => {
   it('returns 401 without a session cookie', async () => {
     clearAuth();
     expect((await meHandler(req('GET', '/api/me'))).status).toBe(401);
+  });
+});
+
+describe('POST /api/auth/login rate limiting', () => {
+  afterEach(() => {
+    delete process.env.LOGIN_RATE_LIMIT_EMAIL;
+  });
+
+  it('locks out after repeated failures per email, with Retry-After', async () => {
+    process.env.LOGIN_RATE_LIMIT_EMAIL = '3';
+    const { user } = await createTestUser({ email: 'ratelimit@test.dev' });
+
+    for (let i = 0; i < 3; i++) {
+      const res = await loginHandler(
+        req('POST', '/api/auth/login', { email: user.email, password: 'wrong-password-xyz' }),
+      );
+      expect(res.status).toBe(401);
+    }
+    const blocked = await loginHandler(
+      req('POST', '/api/auth/login', { email: user.email, password: 'wrong-password-xyz' }),
+    );
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect((await blocked.json()).success).toBe(false);
+  });
+
+  it('a successful login resets the email bucket', async () => {
+    process.env.LOGIN_RATE_LIMIT_EMAIL = '3';
+    const { user, password } = await createTestUser({ email: 'resetbucket@test.dev' });
+
+    for (let i = 0; i < 2; i++) {
+      await loginHandler(
+        req('POST', '/api/auth/login', { email: user.email, password: 'nope-nope' }),
+      );
+    }
+    expect(
+      (await loginHandler(req('POST', '/api/auth/login', { email: user.email, password }))).status,
+    ).toBe(200);
+
+    // Bucket was reset — three more failures allowed before blocking
+    for (let i = 0; i < 3; i++) {
+      const res = await loginHandler(
+        req('POST', '/api/auth/login', { email: user.email, password: 'nope' }),
+      );
+      expect(res.status).toBe(401);
+    }
+    expect(
+      (await loginHandler(req('POST', '/api/auth/login', { email: user.email, password: 'nope' })))
+        .status,
+    ).toBe(429);
+  });
+});
+
+describe('POST /api/auth/register rate limiting', () => {
+  afterEach(() => {
+    delete process.env.REGISTER_RATE_LIMIT_IP;
+  });
+
+  it('rate limits registrations per IP', async () => {
+    process.env.REGISTER_RATE_LIMIT_IP = '2';
+    const stamp = Date.now();
+    for (let i = 0; i < 2; i++) {
+      const res = await registerHandler(
+        req('POST', '/api/auth/register', {
+          name: `User ${i}`,
+          email: `rl${stamp}-${i}@test.dev`,
+          password: 'password123',
+        }),
+      );
+      expect(res.status).toBe(201);
+    }
+    const blocked = await registerHandler(
+      req('POST', '/api/auth/register', {
+        name: 'User 3',
+        email: `rl${stamp}-3@test.dev`,
+        password: 'password123',
+      }),
+    );
+    expect(blocked.status).toBe(429);
   });
 });
