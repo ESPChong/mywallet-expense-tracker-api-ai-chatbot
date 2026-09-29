@@ -69,6 +69,8 @@ tags:
     description: AI analyst over the user's financial data
   - name: Client
     description: Frontend page routes
+  - name: System
+    description: Operational endpoints (health checks)
 
 paths:
   # Client Routes
@@ -890,6 +892,28 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: |
+        Liveness/readiness probe. Not authenticated; not rate limited.
+        `status` is "ok" only when the database responds; the chatbot check is
+        informational and never fails the probe.
+      responses:
+        '200':
+          description: Healthy (database reachable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Database unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
 components:
   securitySchemes:
     sessionAuth:
@@ -1445,6 +1469,26 @@ components:
       required:
         - reply
         - mode
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, unhealthy]
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [up, down]
+            chatbot:
+              type: string
+              enum: [up, down, disabled]
+        timestamp:
+          type: string
+          format: date-time
+      required: [status, checks]
 
   responses:
     Unauthorized:
