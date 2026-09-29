@@ -4,12 +4,7 @@ This is MyWallet, a self-hosted personal finance tracker with a built-in AI anal
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node.js-%3E%3D20-339933.svg)](https://nodejs.org)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-
-<!-- Enable once CI and coverage reporting are set up:
-[![Build Status](https://img.shields.io/github/actions/workflow/status/ESPChong/personal-expense-tracker-with-chatbot-analyst/ci.yml)](https://github.com/ESPChong/personal-expense-tracker-with-chatbot-analyst/actions)
-[![Coverage](https://img.shields.io/codecov/c/github/ESPChong/personal-expense-tracker-with-chatbot-analyst)](https://codecov.io/gh/ESPChong/personal-expense-tracker-with-chatbot-analyst)
--->
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ESPChong/mywallet-expense-tracker-api-ai-chatbot/ci.yml)](https://github.com/ESPChong/mywallet-expense-tracker-api-ai-chatbot/actions)
 
 ## Table of Contents
 
@@ -17,7 +12,6 @@ This is MyWallet, a self-hosted personal finance tracker with a built-in AI anal
 - [Screenshots](#screenshots)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
-- [Architecture Overview](#architecture-overview)
 - [Getting Started](#getting-started)
 - [Environment Variables Reference](#environment-variables-reference)
 - [Scripts Reference](#scripts-reference)
@@ -25,20 +19,16 @@ This is MyWallet, a self-hosted personal finance tracker with a built-in AI anal
 - [API Documentation](#api-documentation)
 - [Deployment and Operations](#deployment-and-operations)
 - [Roadmap](#roadmap)
-- [Contributing](#contributing)
 - [License](#license)
 
 ## Live Demo
 
 - Production: (not yet deployed)
 - Staging: (not yet deployed)
-- API documentation (Swagger UI): (link placeholder)
+- API documentation (Swagger UI): served by the app at `/docs` (for example, `http://localhost:3000/docs` in development)
 - Demo account credentials: (placeholder)
 
 ## Screenshots
-
-<!-- Replace with real screenshots. Suggested location:
-     docs/screenshots/ -->
 
 ### Dashboard
 
@@ -66,7 +56,7 @@ and asking the analyst a question._
 
 - **Session-based authentication.** HTTP-only cookies, bcrypt password hashing, and
   server-side session records stored as SHA-256 hashes. Login and registration are
-  rate limited per email and per IP.
+  rate limited per email and per IP, with optional Redis-backed shared counters.
 - **Expense tracking.** Full CRUD with pagination, month and category filters, and
   strict per-user ownership isolation on every query.
 - **Recurring income.** Income templates post automatically each month. Postings never
@@ -89,14 +79,15 @@ and asking the analyst a question._
 
 ## Tech Stack
 
-| Layer        | Technology                                                                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Frontend     | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn/ui, TanStack Query, react-hook-form with zod resolvers, Recharts, next-themes, sonner |
-| Backend      | Next.js Route Handlers (REST), zod request validation, custom session authentication                                                                         |
-| Database     | MongoDB with Prisma ORM                                                                                                                                      |
-| AI / LLM     | LangChain core primitives with a custom ReAct tool loop, Ollama for local inference (default model: qwen2.5:7b-instruct)                                     |
-| Testing      | Vitest, mongodb-memory-server (in-memory replica set)                                                                                                        |
-| Code quality | ESLint 9 (flat config), Prettier, Husky with lint-staged pre-commit hooks                                                                                    |
+| Layer         | Technology                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Frontend      | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn/ui, TanStack Query, react-hook-form with zod resolvers, Recharts, next-themes, sonner |
+| Backend       | Next.js Route Handlers (REST), zod request validation, custom session authentication                                                                         |
+| Database      | MongoDB with Prisma ORM                                                                                                                                      |
+| Rate limiting | Optional Redis (ioredis) shared counters; in-memory per-process fallback                                                                                     |
+| AI / LLM      | LangChain core primitives with a custom ReAct tool loop, Ollama for local inference (default model: qwen2.5:7b-instruct)                                     |
+| Testing       | Vitest, mongodb-memory-server (in-memory replica set), Playwright (end-to-end)                                                                               |
+| Code quality  | ESLint 9 (flat config), Prettier, Husky with lint-staged pre-commit hooks                                                                                    |
 
 ### Key Design Decisions
 
@@ -111,7 +102,8 @@ and asking the analyst a question._
   login and on expense/income mutations, never during dashboard reads.
 - **Graceful degradation.** If the model server is down, the chatbot endpoint returns
   a deterministic summary built from live data with an explicit `mode` field, rather
-  than an error.
+  than an error. If Redis is down, rate limiting fails open rather than taking the
+  app with it.
 
 ## Getting Started
 
@@ -128,6 +120,9 @@ and asking the analyst a question._
   rs.initiate();
   ```
 
+- **Redis (optional)** for shared rate-limit counters. Without it, rate limits are
+  enforced in-memory per process, which is fine for single-instance deployments.
+  On macOS: `brew install redis && brew services start redis`.
 - **Ollama (optional)** for the AI analyst. Recommended model: `qwen2.5:7b-instruct`
   (about 5 GB on disk; 16 GB of RAM recommended). Without Ollama, the application runs
   normally and the chatbot operates in offline summary mode.
@@ -136,7 +131,7 @@ and asking the analyst a question._
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/ESPChong/personal-expense-tracker-with-chatbot-analyst.git
+git clone https://github.com/ESPChong/mywallet-expense-tracker-api-ai-chatbot.git
 cd expense-tracker
 
 # 2. Install dependencies (prisma generate runs automatically via postinstall)
@@ -152,36 +147,44 @@ npm run db:push
 npm run db:reset:seed
 #    Demo login: dev@example.com / devpassword123 (dev-only credentials)
 
-# 6. (Optional, for the AI analyst) Start Ollama and pull the model
+# 6. (Optional) Enable Redis-backed rate limiting
+#    Start Redis, then uncomment REDIS_URL in .env and restart the dev server
+
+# 7. (Optional, for the AI analyst) Start Ollama and pull the model
 ollama pull qwen2.5:7b-instruct
 ollama serve
 
-# 7. Start the development server
+# 8. Start the development server
 npm run dev
 ```
 
 The app is now running at `http://localhost:3000`. Register an account (or use the
-seeded demo account) to begin.
+seeded demo account) to begin. The interactive API documentation is available at
+`http://localhost:3000/docs`.
 
 ## Environment Variables Reference
 
-| Variable                 | Required | Scope                | Default                  | Description                                                                                     |
-| ------------------------ | -------- | -------------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | Yes      | Local and production | none                     | MongoDB connection string. Must point to a replica set.                                         |
-| `NEXT_PUBLIC_CURRENCY`   | No       | Local and production | `HKD`                    | ISO 4217 currency code used for all display formatting and the chatbot context.                 |
-| `OLLAMA_BASE_URL`        | No       | Local                | `http://localhost:11434` | Base URL of the Ollama server.                                                                  |
-| `CHATBOT_MODEL`          | No       | Local                | `qwen2.5:7b-instruct`    | Model name passed to Ollama.                                                                    |
-| `CHATBOT_LLM_DISABLED`   | No       | Local and test       | unset                    | Set to `true` to force the chatbot into offline summary mode without stopping the model server. |
-| `CHATBOT_DAILY_LIMIT`    | No       | Local and production | `50`                     | Chatbot messages per user per UTC day.                                                          |
-| `LOGIN_RATE_LIMIT_EMAIL` | No       | Local and production | `10`                     | Failed login attempts per email per 15-minute window.                                           |
-| `LOGIN_RATE_LIMIT_IP`    | No       | Local and production | `30`                     | Login attempts per IP per 15-minute window.                                                     |
-| `REGISTER_RATE_LIMIT_IP` | No       | Local and production | `10`                     | Registrations per IP per 15-minute window.                                                      |
+| Variable                 | Required | Scope                | Default                  | Description                                                                                                                                      |
+| ------------------------ | -------- | -------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`           | Yes      | Local and production | none                     | MongoDB connection string. Must point to a replica set.                                                                                          |
+| `REDIS_URL`              | No       | Local and production | unset                    | When set, rate-limit counters are shared across processes and survive restarts (Redis via ioredis); otherwise in-memory per process. Fails open. |
+| `NEXT_PUBLIC_CURRENCY`   | No       | Local and production | `HKD`                    | ISO 4217 currency code used for all display formatting and the chatbot context.                                                                  |
+| `OLLAMA_BASE_URL`        | No       | Local                | `http://localhost:11434` | Base URL of the Ollama server.                                                                                                                   |
+| `CHATBOT_MODEL`          | No       | Local                | `qwen2.5:7b-instruct`    | Model name passed to Ollama.                                                                                                                     |
+| `CHATBOT_LLM_DISABLED`   | No       | Local and test       | unset                    | Set to `true` to force the chatbot into offline summary mode without stopping the model server.                                                  |
+| `CHATBOT_DAILY_LIMIT`    | No       | Local and production | `50`                     | Chatbot messages per user per UTC day.                                                                                                           |
+| `LOGIN_RATE_LIMIT_EMAIL` | No       | Local and production | `10`                     | Failed login attempts per email per 15-minute window.                                                                                            |
+| `LOGIN_RATE_LIMIT_IP`    | No       | Local and production | `30`                     | Login attempts per IP per 15-minute window.                                                                                                      |
+| `REGISTER_RATE_LIMIT_IP` | No       | Local and production | `10`                     | Registrations per IP per 15-minute window.                                                                                                       |
 
 Example `.env`:
 
 ```bash
 # Required
 DATABASE_URL="mongodb://localhost:27017/expense-tracker?replicaSet=rs0&directConnection=true"
+
+# Optional: shared rate limit counter
+# REDIS_URL="redis://localhost:6379"
 
 # Optional: AI analyst
 OLLAMA_BASE_URL="http://localhost:11434"
@@ -202,8 +205,10 @@ Notes:
 
 - Never commit `.env`. Real secrets belong only in your hosting platform's
   environment configuration.
-- The test suite does not read your `.env` database URL for its data: tests boot an
-  in-memory MongoDB replica set and refuse to run against any other target.
+- The test suite reads none of your runtime infrastructure from `.env`: tests boot an
+  in-memory MongoDB replica set (and refuse to run against any other target), and
+  both tests and E2E always run on the in-memory rate limiter regardless of
+  `REDIS_URL`, keeping them hermetic.
 
 ## Scripts Reference
 
@@ -220,9 +225,9 @@ Notes:
 | `npm run db:push`                                | Apply the Prisma schema (collections and indexes) to `DATABASE_URL` |
 | `npm run db:reset`                               | Destructive: wipe all data (guarded by an interactive confirmation) |
 | `npm run db:reset:seed`                          | Wipe and seed demo data                                             |
-| `npm run e2e`                                    | End to end test                                                     |
-| `npm run e2e:ui`                                 | End to end test UI                                                  |
-| `npm run e2e:report`                             | Show E2E test report                                                |
+| `npm run e2e`                                    | End-to-end tests (self-contained stack)                             |
+| `npm run e2e:ui`                                 | End-to-end tests in the interactive Playwright UI                   |
+| `npm run e2e:report`                             | Show the HTML report of the last E2E run                            |
 | `npx tsx scripts/cleanup-retroactive-entries.ts` | Maintenance: remove income postings that predate their template     |
 
 Pre-commit hooks (Husky with lint-staged) run ESLint and Prettier on staged files.
@@ -258,7 +263,21 @@ What is covered:
 
 ### End-to-End Tests
 
-(Not yet implemented.)
+End-to-end tests run a real browser against the full stack: an ephemeral in-memory
+MongoDB, the real Next.js server, and the real frontend. No Ollama is required (the
+chatbot is tested in offline mode); no local database or seeded data is needed. The
+suite is fully self-contained, and identical locally and in CI.
+
+```bash
+npx playwright install chromium    # once, for browser binaries
+npm run e2e                        # headless run
+npm run e2e:ui                     # interactive Playwright UI
+npm run e2e:report                 # open the HTML report of the last run
+```
+
+Covered: registration and the auth gate, login error handling, expense CRUD through
+the UI (including dashboard updates), recurring income creation with the active
+toggle, and the chatbot drawer's offline summary path.
 
 ### Linting and Formatting
 
@@ -271,7 +290,8 @@ npm run format
 
 The complete REST contract, including request and response schemas, error envelopes,
 rate-limit behavior, and the chatbot request and response shapes, is specified in the
-OpenAPI 3.0 specification (`swagger.yaml`) in the `/docs` folder at the repository root.
+OpenAPI 3.0 specification (`swagger.yaml`) in the `/docs` folder at the repository
+root. The running app renders it as interactive Swagger UI at `/docs`.
 
 Endpoint summary:
 
@@ -288,6 +308,7 @@ Endpoint summary:
 | GET, POST          | `/api/categories`    | List and create categories                            |
 | GET                | `/api/dashboard`     | Monthly analytics (pure read)                         |
 | POST               | `/api/chatbot`       | Ask the AI analyst                                    |
+| GET                | `/api/health`        | Health check (unauthenticated)                        |
 
 Conventions: all amounts are integer minor units; a 404 means "not found or not
 owned by you"; every error uses the envelope `{ success: false, error, details? }`.
@@ -309,9 +330,10 @@ DATABASE_URL="<production-url>" npx prisma db push
 
 ### Production Considerations
 
-- **Rate limiting is in-memory.** Limits are enforced per process. For multi-instance
-  deployments, replace the store in `src/lib/rateLimit.ts` with a shared counter
-  (Redis or a MongoDB collection).
+- **Rate limiting is Redis-backed when `REDIS_URL` is set.** Counters are shared
+  across processes and survive restarts; a Redis outage fails open (limits become
+  permissive) rather than taking the app down. Without `REDIS_URL`, limits are
+  enforced in-memory per process, which suits single-instance deployments.
 - **The default model is local-only.** Serverless platforms cannot run Ollama. The
   model is created in a single factory function (`createDefaultModel` in
   `src/services/chatbotService.ts`); swap it there for a hosted provider without
@@ -322,35 +344,74 @@ DATABASE_URL="<production-url>" npx prisma db push
 
 ### Docker
 
-(Not yet implemented.)
+Requires a running MongoDB replica set (see Docker Compose below for one).
+
+```bash
+docker build -t expense-tracker .
+docker run -p 3001:3000 \
+  -e DATABASE_URL="mongodb://host:27017/expense-tracker?replicaSet=rs0&directConnection=true" \
+  expense-tracker
+```
+
+The image runs as a non-root user. The entrypoint applies the Prisma schema
+(idempotent, retried while the database elects a primary), then serves the
+production build on port 3001. The container health check polls `GET /api/health`.
 
 ### Docker Compose
 
-(Not yet implemented.)
+```bash
+docker compose up -d --build          # app + MongoDB + Redis
+docker compose --profile ai up -d     # also Ollama (~5 GB pull, once)
+```
+
+The `db` service is a single-node replica set (required for Prisma transactions);
+`redis` backs the shared rate-limit counters; data persists in the `db-data` volume.
+All services except the app's published port are internal to the compose network.
+Without the `ai` profile, the chatbot operates in offline summary mode.
 
 ### CI/CD
 
-(Not yet implemented.)
+CI runs on every push to `main` and every pull request:
 
 #### GitHub Actions
 
-(Not yet implemented.)
+1. **quality** — ESLint, `tsc --noEmit`, the full Vitest suite (ephemeral in-memory
+   MongoDB), and a production build.
+2. **e2e** — the Playwright suite against a self-contained stack; the HTML report
+   is uploaded as an artifact on failure.
+3. **docker-build** — builds the image to validate the Dockerfile.
 
 #### Quality Gates
 
-(Not yet implemented.)
+All three jobs must pass before merge. MongoDB binaries for the memory server are
+cached between runs.
 
 ### Database Migrations in Production
 
-(Not yet implemented.)
+Schema changes are applied by the container entrypoint via idempotent
+`prisma db push`, retried until the database is available. For a strict migration
+history with reviewable, ordered changes, adopt `prisma migrate` instead.
 
 ### Health Checks
 
-(Not yet implemented.)
-
 #### `/api/health`
 
-(Not yet implemented.)
+`GET /api/health` — unauthenticated, never rate limited:
+
+```json
+{
+  "status": "ok",
+  "checks": { "database": "up", "redis": "up", "chatbot": "up" },
+  "timestamp": "2025-06-18T12:00:00.000Z"
+}
+```
+
+`status` is `ok` (200) only when the database responds. `redis` and `chatbot` are
+informational: a `down` or `disabled` value degrades a feature (fail-open rate
+limiting; offline analyst) without failing the probe. Used by the Docker
+`HEALTHCHECK` and as the Playwright web-server readiness gate. A `503` with
+`database: "down"` means the container should be restarted or the database
+investigated.
 
 ### Staging Environment
 
@@ -358,10 +419,10 @@ DATABASE_URL="<production-url>" npx prisma db push
 
 ## Roadmap
 
-- Playwright end-to-end tests over the full stack
 - Budgets per category, surfaced to the AI analyst for over-budget analysis
 - Chat history persistence across sessions
 - Streaming chatbot replies
+- VPS deployment guide with Caddy reverse proxy and automated HTTPS
 - Hosted-model deployment path for serverless environments
 - Session expiry via MongoDB TTL index
 - Category update and delete with expense reassignment

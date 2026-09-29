@@ -1,23 +1,26 @@
 openapi: 3.0.3
 info:
-  title: 'Personal Expense Tracker API with Chatbot Analyst'
+  title: 'MyWallet - Personal Expense Tracker API with Chatbot Analyst'
   description: |
     A RESTful API for tracking personal expenses with integrated chatbot analysis.
-
+    <br>
+    <br>
     ## Authentication
     The API uses session-based authentication with HTTP-only cookies.
     - Register or login to receive a `session_token` cookie (7-day expiry)
     - Session tokens are stored server-side as SHA-256 hashes and are revocable
     - Include the cookie in subsequent requests
     - Use the `/api/me` endpoint to verify authentication status
-
+    <br>
+    <br>
     ## Rate limiting
     - `POST /api/auth/login`: 10 attempts / 15 min per email AND 30 / 15 min per IP
       (successful login resets the email bucket)
     - `POST /api/auth/register`: 10 / 15 min per IP
     - `POST /api/chatbot`: 50 messages / user / UTC day
     - Limited endpoints return 429; auth endpoints include a `Retry-After` header
-
+    <br>
+    <br>
     ## Conventions
     - **Money:** all amounts are integers in **cents** (e.g. `4999` = $49.99)
     - **IDs:** MongoDB ObjectIds — 24-character hexadecimal strings
@@ -37,11 +40,12 @@ info:
       missing periods between creation and the current period are back-filled
       automatically. Postings are never created or edited directly through
       this API
-
-  version: 1.2.0
+    <br>
+    <br>
+  version: 1.3.0
   contact:
     name: Corrin
-    url: https://github.com/ESPChong/personal-expense-tracker-with-chatbot-analyst
+    url: https://github.com/ESPChong/mywallet-expense-tracker-api-ai-chatbot
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -1419,7 +1423,7 @@ components:
           $ref: '#/components/schemas/DashboardSummary'
         spendingByCategory:
           type: array
-          description: Month's expenses grouped by category, sorted by amount (descending)
+          description: Month's expenses grouped by category (top 5), sorted by amount (descending)
           items:
             $ref: '#/components/schemas/SpendingByCategory'
         recentActivity:
