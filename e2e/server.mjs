@@ -27,6 +27,9 @@ const server = spawn('npx', ['next', 'dev', '-p', APP_PORT], {
   env: {
     ...process.env,
     DATABASE_URL: DB_URL,
+    LOGIN_RATE_LIMIT_IP: '1000',
+    LOGIN_RATE_LIMIT_EMAIL: '1000',
+    REGISTER_RATE_LIMIT_IP: '1000',
     // No Ollama in E2E: the chatbot runs in deterministic offline mode.
     CHATBOT_LLM_DISABLED: 'true',
     // Headroom in case specs are extended to send many messages.
