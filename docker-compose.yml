@@ -1,0 +1,61 @@
+name: expense-tracker
+
+services:
+  db:
+    image: mongo:7
+    # Single-node replica set (required: registration uses Prisma transactions)
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    volumes:
+      - db-data:/data/db
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}).ok }",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      args:
+        # Inlined at build time — see Dockerfile ARG
+        NEXT_PUBLIC_CURRENCY: ${NEXT_PUBLIC_CURRENCY:-HKD}
+    environment:
+      # directConnection avoids replica-set host-name discovery issues when
+      # the set was initiated as localhost but addressed as `db` on this network
+      DATABASE_URL: mongodb://db:27017/expense-tracker?replicaSet=rs0&directConnection=true
+      CHATBOT_MODEL: ${CHATBOT_MODEL:-qwen2.5:7b-instruct}
+      OLLAMA_BASE_URL: http://ollama:11434
+      CHATBOT_DAILY_LIMIT: ${CHATBOT_DAILY_LIMIT:-50}
+    ports:
+      - '3000:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional local AI: `docker compose --profile ai up`
+  # Pulls ~5 GB on first start; CPU inference of a 7B model is slow but usable.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ['ai']
+    volumes:
+      - ollama-models:/root/.ollama
+    command: >
+      sh -c "ollama serve &
+             sleep 5 &&
+             ollama pull ${OLLAMA_MODEL:-qwen2.5:7b-instruct} &&
+             wait"
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  ollama-models:
