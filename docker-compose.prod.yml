@@ -1,0 +1,65 @@
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - '80:80'
+      - '443:443' # the ONLY public ports on the whole VPS
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # certificates persist across restarts
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_CURRENCY: ${NEXT_PUBLIC_CURRENCY:-HKD}
+    environment:
+      DATABASE_URL: mongodb://db:27017/expense-tracker?replicaSet=rs0&directConnection=true
+      OLLAMA_BASE_URL: http://ollama:11434
+      CHATBOT_MODEL: ${CHATBOT_MODEL:-qwen2.5:7b-instruct}
+    # NOTE: no "ports:" — app is internal-only now; caddy fronts it
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped # ← the line that makes this production-grade
+
+  db:
+    image:
+      mongo:7
+      # Single-node replica set (required: registration uses Prisma transactions)
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    volumes:
+      - db-data:/data/db
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}).ok }",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ['ai']
+    volumes:
+      - ollama-models:/root/.ollama
+    command: >
+      sh -c "ollama serve &
+             sleep 5 &&
+             ollama pull ${OLLAMA_MODEL:-qwen2.5:7b-instruct} &&
+             wait"
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  caddy-data:
