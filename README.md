@@ -1,6 +1,6 @@
-# WalletBuddy - Production-Ready Personal Expense Tracker API with Chatbot Analyst
+# MyWallet - Production-Ready Personal Expense Tracker API with Chatbot Analyst
 
-This is WalletBuddy, a self-hosted personal finance tracker with a built-in AI analyst. Log expenses and recurring income, visualize monthly spending, and ask a locally hosted language model questions about your own data, with deterministic, fully tested numbers underneath.
+This is MyWallet, a self-hosted personal finance tracker with a built-in AI analyst. Log expenses and recurring income, visualize monthly spending, and ask a locally hosted language model questions about your own data, with deterministic, fully tested numbers underneath.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node.js-%3E%3D20-339933.svg)](https://nodejs.org)

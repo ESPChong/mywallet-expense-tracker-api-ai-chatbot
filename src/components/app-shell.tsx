@@ -101,7 +101,7 @@ function BrandMark() {
       <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg">
         <Wallet className="h-4 w-4" />
       </div>
-      <span className="font-semibold tracking-tight">Wallet Buddy</span>
+      <span className="font-semibold tracking-tight">MyWallet</span>
     </Link>
   );
 }

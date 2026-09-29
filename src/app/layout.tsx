@@ -8,7 +8,7 @@ const geistSans = Geist({ variable: '--font-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: { default: 'Wallet Buddy', template: '%s · Expense Tracker' },
+  title: { default: 'MyWallet', template: '%s · Expense Tracker' },
   description: 'Personal expense tracking with an AI analyst',
 };
 
