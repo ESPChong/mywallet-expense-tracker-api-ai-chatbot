@@ -27,6 +27,7 @@ const server = spawn('npx', ['next', 'dev', '-p', APP_PORT], {
   env: {
     ...process.env,
     DATABASE_URL: DB_URL,
+    REDIS_URL: '',
     LOGIN_RATE_LIMIT_IP: '1000',
     LOGIN_RATE_LIMIT_EMAIL: '1000',
     REGISTER_RATE_LIMIT_IP: '1000',

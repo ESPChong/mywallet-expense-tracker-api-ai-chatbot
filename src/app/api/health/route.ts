@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { pingRedis, isRedisEnabled } from '@/lib/redis';
 
 // Never statically cached — health must reflect the live process.
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ export async function GET(_request: NextRequest) {
   try {
     await prisma.$runCommandRaw({ ping: 1 });
     checks.database = 'up';
+    checks.redis = isRedisEnabled() ? ((await pingRedis()) ? 'up' : 'down') : 'disabled';
   } catch {
     checks.database = 'down';
     healthy = false;

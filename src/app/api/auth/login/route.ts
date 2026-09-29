@@ -36,12 +36,12 @@ export async function POST(request: Request) {
     // known emails (no enumeration via limiter timing). Attackers must pass
     // BOTH the per-email and per-IP buckets.
     const ip = clientIpFromRequest(request);
-    const emailCheck = checkWindowRateLimit(
+    const emailCheck = await checkWindowRateLimit(
       `login:email:${email}`,
       envLimit('LOGIN_RATE_LIMIT_EMAIL', 10),
       RATE_WINDOW_MS,
     );
-    const ipCheck = checkWindowRateLimit(
+    const ipCheck = await checkWindowRateLimit(
       `login:ip:${ip}`,
       envLimit('LOGIN_RATE_LIMIT_IP', 30),
       RATE_WINDOW_MS,

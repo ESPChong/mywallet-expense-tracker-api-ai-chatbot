@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     if (!result.success) return apiError(400, 'Validation failed', result.error.issues);
     const { message, month, history } = result.data;
 
-    const limit = checkRateLimit(`chatbot:${user.id}`, envLimit('CHATBOT_DAILY_LIMIT', 50));
+    const limit = await checkRateLimit(`chatbot:${user.id}`, envLimit('CHATBOT_DAILY_LIMIT', 50));
     if (!limit.allowed) {
       return NextResponse.json(
         { success: false, error: 'Daily message limit exceeded', resetAt: limit.resetAt },

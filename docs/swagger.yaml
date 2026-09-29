@@ -1482,6 +1482,9 @@ components:
             database:
               type: string
               enum: [up, down]
+            redis:
+              type: string
+              enum: [up, down, disabled]
             chatbot:
               type: string
               enum: [up, down, disabled]

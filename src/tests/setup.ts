@@ -5,6 +5,7 @@ import { cookieStore } from './mocks/next-headers';
 
 // Deterministic chatbot behavior in tests: never reach for a real Ollama
 process.env.CHATBOT_LLM_DISABLED = 'true';
+delete process.env.REDIS_URL;
 
 beforeEach(async () => {
   resetRateLimiter();

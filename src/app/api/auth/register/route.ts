@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     // Rate limit registrations per IP (mass account-creation guard)
     const ip = clientIpFromRequest(request);
-    const ipCheck = checkWindowRateLimit(
+    const ipCheck = await checkWindowRateLimit(
       `register:ip:${ip}`,
       envLimit('REGISTER_RATE_LIMIT_IP', 10),
       RATE_WINDOW_MS,
