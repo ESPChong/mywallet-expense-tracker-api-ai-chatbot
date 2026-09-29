@@ -108,6 +108,21 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /docs:
+    get:
+      tags: [Client]
+      summary: Get API documentation page
+      description: Returns the Swagger UI page rendering the OpenAPI specification.
+      responses:
+        '200':
+          description: API documentation rendered successfully.
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /register:
     get:
       tags: [Client]
@@ -637,7 +652,7 @@ paths:
     get:
       tags: [Incomes]
       summary: List recurring income templates
-      description: A newly created template only generates postings from its creation period onward — it never back-fills months before it existed.
+      description: Returns the authenticated user's recurring income templates, active ones first.
       security:
         - sessionAuth: []
       responses:
@@ -662,6 +677,9 @@ paths:
 
         `dayOfMonth` values above a month's length are capped to that month's
         last day (e.g. `31` posts on Feb 28).
+
+        A newly created template only generates postings from its creation
+        period onward — it never back-fills months before it existed.
       security:
         - sessionAuth: []
       requestBody:
