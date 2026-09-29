@@ -220,6 +220,9 @@ Notes:
 | `npm run db:push`                                | Apply the Prisma schema (collections and indexes) to `DATABASE_URL` |
 | `npm run db:reset`                               | Destructive: wipe all data (guarded by an interactive confirmation) |
 | `npm run db:reset:seed`                          | Wipe and seed demo data                                             |
+| `npm run e2e`                                    | End to end test                                                     |
+| `npm run e2e:ui`                                 | End to end test UI                                                  |
+| `npm run e2e:report`                             | Show E2E test report                                                |
 | `npx tsx scripts/cleanup-retroactive-entries.ts` | Maintenance: remove income postings that predate their template     |
 
 Pre-commit hooks (Husky with lint-staged) run ESLint and Prettier on staged files.

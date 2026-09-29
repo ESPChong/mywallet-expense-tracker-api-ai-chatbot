@@ -14,7 +14,10 @@
     "postinstall": "prisma generate",
     "db:push": "npx prisma db push",
     "db:reset": "tsx src/scripts/reset-db.ts",
-    "db:reset:seed": "tsx src/scripts/reset-db.ts --seed"
+    "db:reset:seed": "tsx src/scripts/reset-db.ts --seed",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
