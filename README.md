@@ -160,7 +160,7 @@ ollama serve
 npm run dev
 ```
 
-The app is now running at `http://localhost:3000`. Register an account (or use the
+The app is now running at `http://localhost:3001`. Register an account (or use the
 seeded demo account) to begin.
 
 ## Environment Variables Reference

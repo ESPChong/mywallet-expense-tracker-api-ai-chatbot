@@ -36,7 +36,7 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       CHATBOT_DAILY_LIMIT: ${CHATBOT_DAILY_LIMIT:-50}
     ports:
-      - '3000:3000'
+      - '3001:3000'
     depends_on:
       db:
         condition: service_healthy
