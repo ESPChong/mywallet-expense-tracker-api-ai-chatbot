@@ -369,6 +369,65 @@ The `db` service is a single-node replica set (required for Prisma transactions)
 All services except the app's published port are internal to the compose network.
 Without the `ai` profile, the chatbot operates in offline summary mode.
 
+### Kubernetes (Minikube)
+
+_**Important Note**_: _The status of this Kubernetes implementation is educational only._
+
+This layer exists to learn Kubernetes orchestration concepts (Deployments, StatefulSets, Services, probes, rollouts) against a realistic application — not as the recommended production deployment. For production, prefer Docker Compose on a singlehost (see above), it is simpler and sufficient for this application's scale. The Kubernetes manifests deliberately omit the Ollama AI service and run the chatbot in offline mode.
+
+The manifests in k8s/ run the app (2 replicas), MongoDB as a single-member replica set (StatefulSet + persistent volume), and Redis, ona local Minikube cluster:
+
+```bash
+# One-time
+minikube start --cpus 4 --memory 6144
+minikube addons enable ingress
+echo "$(minikube ip) mywallet.local" | sudo tee -a /etc/hosts
+
+# Build into minikube daemon
+minikube image build -t mywallet:dev .
+
+# Launch
+kubectl apply -f k8s/
+kubectl get pods -n mywallet -w
+```
+
+The app is then served at http://mywallet.local. The app image is built
+inside Minikube's own Docker daemon (minikube image build); rebuilding
+with the same tag does not update running pods — update with:
+
+```bash
+TAG="dev-$(date +%s)"
+minikube image build -t mywallet:$TAG .
+kubectl set image deployment/mywallet-app app=mywallet:$TAG -n mywallet
+kubectl rollout status deployment/mywallet-app -n mywallet
+```
+
+Notable behaviors, by design:
+
+**App pods may restart during first startup** — the image entrypoint
+retries prisma db push until the MongoDB replica set has elected a
+primary. This is the migration strategy (idempotent, self-healing), not
+a crash loop.
+**Readiness probes gate traffic on `/api/health`** — a pod whose
+database is unreachable is removed from the Service until it recovers,
+rather than restarted.
+**Two replicas share rate-limit state via Redis** — demonstrating why
+the in-memory limiter is only correct for single-instance deployments:
+with multiple pods, per-process counters would silently under-count.
+
+Teardown, preserving data:
+
+```bash
+kubectl delete -f k8s/
+minikube stop
+```
+
+Full teardown including the MongoDB volume:
+
+```bash
+kubectl delete -f k8s/ && minikube delete
+```
+
 ### CI/CD
 
 CI runs on every push to `main` and every pull request:
