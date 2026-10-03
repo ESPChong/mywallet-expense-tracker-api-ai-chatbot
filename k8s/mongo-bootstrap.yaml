@@ -1,0 +1,58 @@
+# One-shot replica-set initiation — the K8s translation of the compose
+# healthcheck's rs.initiate() trick. Runs once after Mongo is up, then
+# completes. Safe to re-apply: it checks for an existing config first.
+#
+# retries: mongod may still be starting when this Job's pod schedules; the
+# loop sleeps and retries for up to ~2 minutes before giving up.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongo-bootstrap
+  namespace: mywallet
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        app: mongo-bootstrap
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: initiate
+          image: mongo:7
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo ">> Waiting for mongod..."
+              i=0
+              until mongosh --host mongo.mywallet.svc.cluster.local --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null; do
+                i=$((i+1))
+                if [ "$i" -ge 24 ]; then
+                  echo ">> mongod never became reachable" >&2
+                  exit 1
+                fi
+                sleep 5
+              done
+              echo ">> Initiating replica set (idempotent)..."
+              mongosh --host mongo.mywallet.svc.cluster.local --quiet --eval "
+                try {
+                  rs.status().ok;
+                  print('>> Replica set already configured');
+                } catch (e) {
+                  rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]});
+                  print('>> Replica set initiated');
+                }
+              "
+              echo ">> Waiting for primary..."
+              i=0
+              until mongosh --host mongo.mywallet.svc.cluster.local --quiet --eval "rs.status().myState === 1" 2>/dev/null | grep -q true; do
+                i=$((i+1))
+                if [ "$i" -ge 24 ]; then
+                  echo ">> Primary never elected" >&2
+                  exit 1
+                fi
+                sleep 5
+              done
+              echo ">> Replica set has a primary. Done."

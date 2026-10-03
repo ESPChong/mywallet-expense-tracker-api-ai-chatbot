@@ -1,0 +1,77 @@
+# MongoDB as a single-member replica set.
+#
+# Why StatefulSet not Deployment: stable identity + PVC ownership for a
+# stateful process. (A Deployment would technically work for one member,
+# but this is the honest object for a database.)
+#
+# The replica set is initiated as "localhost:27017" by the bootstrap Job,
+# and every client connects with directConnection=true, so no K8s DNS
+# names ever enter the replica-set config. This is the same trick the
+# docker-compose healthcheck uses — it ports over verbatim.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: mywallet
+spec:
+  serviceName: mongo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7
+          command: ['mongod', '--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+          ports:
+            - containerPort: 27017
+              name: mongo
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          readinessProbe:
+            # "ready" = replica set has an elected primary. Pods without a
+            # primary are not yet usable by the app (or the bootstrap Job).
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - 'try { rs.status().ok } catch (e) { 0 }'
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ['ReadWriteOnce']
+        resources:
+          requests:
+            storage: 5Gi
+---
+# Headless service: gives the StatefulSet its stable network identity.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  namespace: mywallet
+spec:
+  clusterIP: None
+  selector:
+    app: mongo
+  ports:
+    - port: 27017
+      targetPort: 27017

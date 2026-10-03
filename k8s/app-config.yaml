@@ -1,0 +1,25 @@
+# Non-secret configuration → ConfigMap; the database URL → Secret.
+# (The URL contains no password, but it is still connection-string-shaped —
+# treating it as a Secret is the correct default habit, and swapping in
+# auth credentials later means changing one place.)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: mywallet
+data:
+  NEXT_PUBLIC_CURRENCY: 'HKD'
+  CHATBOT_LLM_DISABLED: 'true' # educational stack: chatbot runs in offline mode
+  CHATBOT_DAILY_LIMIT: '50'
+  LOGIN_RATE_LIMIT_EMAIL: '10'
+  LOGIN_RATE_LIMIT_IP: '30'
+  REGISTER_RATE_LIMIT_IP: '10'
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: mywallet
+data:
+  # mongodb://mongo.mywallet.svc.cluster.local:27017/expense-tracker?replicaSet=rs0&directConnection=true
+  DATABASE_URL: bW9uZ29kYjovL21vbmdvLm15d2FsbGV0LnN2Yy5jbHVzdGVyLmxvY2FsOjI3MDE3L2V4cGVuc2UtdHJhY2tlcj9yZXBsaWNhU2V0PXJzMCZkaXJlY3RDb25uZWN0aW9uPXRydWU=

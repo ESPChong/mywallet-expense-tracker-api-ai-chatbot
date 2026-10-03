@@ -1,0 +1,78 @@
+# The application. 2 replicas to demonstrate the scale-out behavior the
+# Redis rate limiter was built for (in-memory limiting would silently
+# split counters across pods).
+#
+# Schema push: the image entrypoint's retried `prisma db push` handles it.
+# Expect the first pod starts to show restarts — that is the entrypoint
+# retrying until the replica set has a primary. Intentional, not broken.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mywallet-app
+  namespace: mywallet
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mywallet-app
+  template:
+    metadata:
+      labels:
+        app: mywallet-app
+    spec:
+      containers:
+        - name: app
+          image: mywallet:dev # set your tag with --build-arg or kubectl set image
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: REDIS_URL
+              value: 'redis://redis.mywallet.svc.cluster.local:6379'
+          # Readiness: /api/health 503s while the DB is unreachable → pod
+          # leaves the Service's endpoints until it recovers.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Liveness: deliberately lenient. A MongoDB outage must NOT restart
+          # the app (restarting the app cannot fix the database, and
+          # readiness already removed the pod from traffic). The process
+          # itself crashing exits the container, which restarts it — that
+          # covers the case liveness would exist for.
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6 # ~3 minutes of DB-down before a restart
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 150m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mywallet-app
+  namespace: mywallet
+spec:
+  selector:
+    app: mywallet-app
+  ports:
+    - port: 3000
+      targetPort: 3000

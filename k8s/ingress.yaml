@@ -1,0 +1,25 @@
+# The single public door. Everything else (mongo, redis) exists only on the
+# internal cluster network — the same dark-network principle as compose.
+#
+# http://mywallet.local requires a /etc/hosts entry pointing the name at
+# the minikube IP (see README instructions).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mywallet
+  namespace: mywallet
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 8m
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: mywallet.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mywallet-app
+                port:
+                  number: 3000

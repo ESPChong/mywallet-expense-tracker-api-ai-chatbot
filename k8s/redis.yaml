@@ -1,0 +1,54 @@
+# Redis for shared rate-limit counters. Ephemeral by design — counters are
+# short-TTL security metadata; losing them degrades to fail-open, which is
+# the intended behavior. No persistence volume needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: mywallet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ['--maxmemory', '64mb', '--maxmemory-policy', 'allkeys-lru']
+          ports:
+            - containerPort: 6379
+              name: redis
+          readinessProbe:
+            exec:
+              command: ['redis-cli', 'ping']
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ['redis-cli', 'ping']
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 80m
+              memory: 96Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: mywallet
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
