@@ -428,6 +428,12 @@ Full teardown including the MongoDB volume:
 kubectl delete -f k8s/ && minikube delete
 ```
 
+### Caddy (Production Deployment)
+
+**Status: educational only — the app is not deployed.**
+
+A ready-to-use production configuration (`Caddyfile` + `docker-compose.prod.yml`) is included to demonstrate a complete deployment shape (reverse proxy with automated HTTPS via Let's Encrypt, internal-only database and cache). It exists to keep the project deployment-ready, not to serve production traffic.
+
 ### CI/CD
 
 CI runs on every push to `main` and every pull request:
@@ -481,7 +487,6 @@ investigated.
 - Budgets per category, surfaced to the AI analyst for over-budget analysis
 - Chat history persistence across sessions
 - Streaming chatbot replies
-- VPS deployment guide with Caddy reverse proxy and automated HTTPS
 - Hosted-model deployment path for serverless environments
 - Session expiry via MongoDB TTL index
 - Category update and delete with expense reassignment
