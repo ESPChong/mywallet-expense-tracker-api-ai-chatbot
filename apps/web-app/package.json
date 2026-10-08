@@ -1,5 +1,5 @@
 {
-  "name": "expense-tracker",
+  "name": "mywallet-web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,6 @@
     "test:watch": "vitest",
     "lint": "eslint",
     "format": "prettier --write .",
-    "prepare": "husky",
     "postinstall": "prisma generate",
     "db:push": "npx prisma db push",
     "db:reset": "tsx src/scripts/reset-db.ts",
@@ -20,6 +19,7 @@
     "e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@mywallet/shared": "*",
     "@base-ui/react": "^1.8.0",
     "@hookform/resolvers": "^5.9.1",
     "@langchain/core": "^1.2.13",

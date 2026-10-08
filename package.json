@@ -1,8 +1,28 @@
 {
+  "name": "mywallet",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
+    "web": "npm run dev --workspace apps/web-app -H 0.0.0.0",
+    "web:build": "npm run build --workspace apps/web-app",
+    "web:start": "npm run start --workspace apps/web-app",
+    "web:test": "npm run test --workspace apps/web-app",
+    "web:lint": "npm run lint --workspace apps/web-app",
+    "web:format": "npm run format --workspace apps/web-app",
+    "web:e2e": "npm run web:e2e --workspace apps/web-app",
+    "db:push": "npm run db:push --workspace apps/web-app",
+    "db:reset": "npm run db:reset --workspace apps/web-app",
+    "db:reset:seed": "npm run db:reset:seed --workspace apps/web-app",
+    "mobile": "npm run start --workspace apps/mobile-app",
+    "mobile:test": "npm run test --workspace apps/mobile-app",
     "prepare": "husky"
   },
   "devDependencies": {
+    "eslint": "^10.12.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.9"
@@ -19,5 +39,8 @@
     "*.{json,md,css,scss,html,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "typescript": "^7.0.2"
   }
 }
