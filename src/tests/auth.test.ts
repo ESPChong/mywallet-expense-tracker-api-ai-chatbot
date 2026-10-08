@@ -1,12 +1,25 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { prisma } from '@/lib/prisma';
-import { hashSessionToken } from '@/lib/session';
-import { cookieStore } from './mocks/next-headers';
-import { req, createTestUser, createUserWithSession, authenticate, clearAuth } from './helpers';
+import { hashSessionToken, generateSessionToken } from '@/lib/session';
+import { headerStore, cookieStore } from './mocks/next-headers';
+import {
+  req,
+  createTestUser,
+  createSession,
+  createUserWithSession,
+  authenticate,
+  clearAuth,
+} from './helpers';
 import { POST as registerHandler } from '@/app/api/auth/register/route';
 import { POST as loginHandler } from '@/app/api/auth/login/route';
 import { POST as logoutHandler } from '@/app/api/auth/logout/route';
 import { GET as meHandler } from '@/app/api/me/route';
+
+async function createBearerSession(userId: string) {
+  const token = await createSession(userId);
+  headerStore.set('authorization', `Bearer ${token}`);
+  return token;
+}
 
 describe('POST /api/auth/register', () => {
   it('creates the user, seeds 9 default categories, hashes the password, opens a session', async () => {
@@ -125,6 +138,78 @@ describe('GET /api/me', () => {
   it('returns 401 without a session cookie', async () => {
     clearAuth();
     expect((await meHandler(req('GET', '/api/me'))).status).toBe(401);
+  });
+});
+
+describe('Bearer token authentication', () => {
+  beforeEach(() => {
+    headerStore.clear();
+    cookieStore.clear();
+  });
+
+  it('login returns sessionToken in the response body', async () => {
+    const { password } = await createTestUser({ email: 'bearer@test.dev' });
+
+    const res = await loginHandler(
+      req('POST', '/api/auth/login', { email: 'bearer@test.dev', password }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(typeof body.sessionToken).toBe('string');
+    expect(body.sessionToken.length).toBeGreaterThan(0);
+  });
+
+  it('authenticates /api/me with a Bearer token and no cookie', async () => {
+    const { user } = await createTestUser({ email: 'bearer2@test.dev' });
+    await createBearerSession(user.id);
+
+    const res = await meHandler(req('GET', '/api/me'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.user.email).toBe('bearer2@test.dev');
+  });
+
+  it('rejects an invalid Bearer token with 401', async () => {
+    await createTestUser({ email: 'bearer3@test.dev' });
+    headerStore.set('authorization', 'Bearer invalid-token-xyz');
+    cookieStore.clear();
+
+    expect((await meHandler(req('GET', '/api/me'))).status).toBe(401);
+  });
+
+  it('prefers the cookie when both are present (browser backward compat)', async () => {
+    const userA = await createTestUser({ email: 'usera@test.dev' });
+    const userB = await createTestUser({ email: 'userb@test.dev' });
+
+    const cookieToken = await createSession(userA.user.id);
+    cookieStore.set('session_token', cookieToken);
+    await createBearerSession(userB.user.id);
+
+    const res = await meHandler(req('GET', '/api/me'));
+    const body = await res.json();
+    expect(body.user.email).toBe('usera@test.dev'); // cookie wins
+  });
+
+  it('rejects an expired Bearer token and deletes the session row', async () => {
+    const { user } = await createTestUser({ email: 'bearer4@test.dev' });
+
+    const token = generateSessionToken();
+    await prisma.session.create({
+      data: {
+        sessionToken: hashSessionToken(token),
+        userId: user.id,
+        expiresAt: new Date(Date.now() - 1000),
+      },
+    });
+
+    headerStore.set('authorization', `Bearer ${token}`);
+    cookieStore.clear();
+
+    expect((await meHandler(req('GET', '/api/me'))).status).toBe(401);
+    // delete-on-encounter cleanup fired
+    expect(await prisma.session.count({ where: { userId: user.id } })).toBe(0);
   });
 });
 

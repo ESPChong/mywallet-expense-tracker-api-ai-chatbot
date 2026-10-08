@@ -1,7 +1,7 @@
 import { beforeEach, afterAll } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import { resetRateLimiter } from '@/lib/rateLimit';
-import { cookieStore } from './mocks/next-headers';
+import { headerStore, cookieStore } from './mocks/next-headers';
 
 // Deterministic chatbot behavior in tests: never reach for a real Ollama
 process.env.CHATBOT_LLM_DISABLED = 'true';
@@ -23,6 +23,7 @@ beforeEach(async () => {
   await prisma.category.deleteMany();
   await prisma.session.deleteMany();
   await prisma.user.deleteMany();
+  headerStore.clear();
   cookieStore.clear();
 });
 

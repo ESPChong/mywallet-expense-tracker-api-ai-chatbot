@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { prisma } from './prisma';
 import { hashSessionToken } from './session';
 
@@ -6,7 +6,13 @@ export type AuthUser = { id: string; name: string; email: string };
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
-  const token = cookieStore.get('session_token')?.value;
+  const cookieToken = cookieStore.get('session_token')?.value;
+
+  const headerStore = await headers();
+  const authHeader = headerStore.get('authorization');
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  const token = cookieToken ?? bearerToken;
   if (!token) return null;
 
   const session = await prisma.session.findUnique({
