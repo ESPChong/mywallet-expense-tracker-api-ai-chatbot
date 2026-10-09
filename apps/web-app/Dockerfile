@@ -1,21 +1,19 @@
-# ── deps: full install (build tooling + prisma CLI) ────────────────────────
-FROM node:26-alpine AS deps
+# ── builder: full install and compile ────────────────────────
+FROM node:26-alpine AS builder
 WORKDIR /app
-ENV HUSKY=0
+ENV HUSKY=0 \
+    NEXT_TELEMETRY_DISABLED=1
+# Manifests first so the `npm ci` layer caches independently of source changes.
 COPY package.json package-lock.json ./
 COPY apps/web-app/package.json apps/web-app/package.json
 COPY apps/mobile-app/package.json apps/mobile-app/package.json
 COPY packages/shared/package.json packages/shared/package.json
-# Schema must exist before npm ci: postinstall runs `prisma generate`.
+# Schema must exist before npm ci: web-app's postinstall runs `prisma generate`.
 COPY apps/web-app/prisma apps/web-app/prisma
 RUN npm ci
-
-# ── builder: compile the app ───────────────────────────────────────────────
-FROM node:26-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Sources — node_modules and src/generated are dockerignored, so this
+# can't clobber the install or the generated client.
 COPY . .
-COPY --from=deps /app/apps/web-app/src/generated ./apps/web-app/src/generated
 ARG NEXT_PUBLIC_CURRENCY=HKD
 ENV NEXT_PUBLIC_CURRENCY=$NEXT_PUBLIC_CURRENCY
 RUN npm run build --workspace apps/web-app
@@ -34,8 +32,10 @@ COPY apps/mobile-app/package.json apps/mobile-app/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-COPY --from=deps /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
+# Prisma CLI (devDep) for the entrypoint's schema push, plus @prisma/* with
+# engines downloaded (scripts were allowed to run in the builder):
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 COPY --from=builder /app/apps/web-app/.next ./apps/web-app/.next
 COPY --from=builder /app/apps/web-app/src/generated ./apps/web-app/src/generated
