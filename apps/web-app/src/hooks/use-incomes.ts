@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
 import { dashboardKeys } from './use-dashboard';
-import type { Income } from '@/types/api';
+import type { Income } from '@mywallet/shared/src/types/api';
 
 export const incomeKeys = {
   all: ['incomes'] as const,

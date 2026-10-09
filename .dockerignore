@@ -1,0 +1,18 @@
+.git
+.github
+.husky
+**/node_modules
+apps/web-app/.next
+apps/web-app/e2e
+apps/web-app/src/tests
+apps/web-app/test-results
+apps/web-app/test_results
+apps/web-app/playwright-report
+apps/web-app/coverage
+apps/web-app/src/generated
+**/.env
+**/.env.*
+!**/.env.example
+# mobile isn't part of the web image, but npm ci needs its manifest
+apps/mobile-app/*
+!apps/mobile-app/package.json

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { chatbotRequestSchema } from '@/lib/validations';
+import { chatbotRequestSchema } from '@mywallet/shared/src/validations';
 import { checkRateLimit, envLimit } from '@/lib/rateLimit';
 import { apiError } from '@/lib/api-response';
 import { buildChatbotContext } from '@/services/chatbotContextService';

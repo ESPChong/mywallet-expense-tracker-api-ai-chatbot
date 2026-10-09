@@ -3,8 +3,8 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChartPie } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCents, formatCentsCompact } from '@/lib/format';
-import type { SpendingByCategory } from '@/types/api';
+import { formatCents, formatCentsCompact } from '@mywallet/shared/src/format';
+import type { SpendingByCategory } from '@mywallet/shared/src/types/api';
 
 // Categorical palette (token-based, so dark mode follows automatically).
 // Emerald/rose deliberately absent — those mean income/expense, not categories.

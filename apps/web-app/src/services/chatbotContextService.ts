@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { processRecurringIncome } from './incomeService';
-import { CURRENCY } from '@/lib/format';
+import { CURRENCY } from '@mywallet/shared/src/format';
 
 export interface CategorySummary {
   name: string;

@@ -1,8 +1,8 @@
 import { ArrowDownLeft, ArrowUpRight, Inbox } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { formatCents, formatDateShort, formatSignedCents } from '@/lib/format';
-import type { RecentActivityItem } from '@/types/api';
+import { formatCents, formatDateShort, formatSignedCents } from '@mywallet/shared/src/format';
+import type { RecentActivityItem } from '@mywallet/shared/src/types/api';
 
 export function ActivityFeed({ items }: { items: RecentActivityItem[] }) {
   return (

@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCents, formatSignedCents } from '@/lib/format';
+import { formatCents, formatSignedCents } from '@mywallet/shared/src/format';
 
 const VALUE_TONES = {
   positive: 'text-emerald-600 dark:text-emerald-400',

@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
 import { dashboardKeys } from './use-dashboard';
-import type { Expense, ExpenseListResponse } from '@/types/api';
+import type { Expense, ExpenseListResponse } from '@mywallet/shared/src/types/api';
 
 export interface ExpenseFilters {
   month: string;

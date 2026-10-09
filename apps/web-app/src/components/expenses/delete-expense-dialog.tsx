@@ -2,9 +2,9 @@
 
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCents } from '@/lib/format';
+import { formatCents } from '@mywallet/shared/src/format';
 import { useDeleteExpense } from '@/hooks/use-expenses';
-import type { Expense } from '@/types/api';
+import type { Expense } from '@mywallet/shared/src/types/api';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,

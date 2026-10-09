@@ -1,6 +1,7 @@
 # ── deps: full install (build tooling + prisma CLI) ────────────────────────
 FROM node:20-alpine AS deps
 WORKDIR /app
+ENV HUSKY=0
 COPY package.json package-lock.json ./
 # Schema must exist before npm ci: postinstall runs `prisma generate`.
 COPY prisma ./prisma

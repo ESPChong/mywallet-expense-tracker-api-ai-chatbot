@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { incomeCreateSchema } from '@/lib/validations';
+import { incomeCreateSchema } from '@mywallet/shared/src/validations';
 import { materializeUserIncomeSafe } from '@/services/incomeService';
 
 function unauthorized() {

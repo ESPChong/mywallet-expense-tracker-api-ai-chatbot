@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { expenseCreateSchema, expenseQuerySchema } from '@/lib/validations';
+import { expenseCreateSchema, expenseQuerySchema } from '@mywallet/shared/src/validations';
 import { materializeUserIncomeSafe } from '@/services/incomeService';
 
 const CATEGORY_INCLUDE = { category: { select: { id: true, name: true } } };

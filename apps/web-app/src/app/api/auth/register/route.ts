@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { registerSchema } from '@/lib/validations';
+import { registerSchema } from '@mywallet/shared/src/validations';
 import { generateSessionToken, hashSessionToken } from '@/lib/session';
 import { checkWindowRateLimit, envLimit, clientIpFromRequest } from '@/lib/rateLimit';
 import bcrypt from 'bcryptjs';

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { addMonths, currentMonthString, monthLabel } from '@/lib/format';
+import { addMonths, currentMonthString, monthLabel } from '@mywallet/shared/src/format';
 import { Button } from '@/components/ui/button';
 
 const MONTHS_BACK = 36;

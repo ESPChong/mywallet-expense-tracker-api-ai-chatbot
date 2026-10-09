@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { categoryCreateSchema } from '@/lib/validations';
+import { categoryCreateSchema } from '@mywallet/shared/src/validations';
 import { apiError } from '@/lib/api-response';
 
 export async function GET(_request: NextRequest) {

@@ -34,7 +34,8 @@ services:
 
   app:
     build:
-      context: .
+      context: ../..
+      dockerfile: apps/web-app/Dockerfile
       args:
         # Inlined at build time — see Dockerfile ARG
         NEXT_PUBLIC_CURRENCY: ${NEXT_PUBLIC_CURRENCY:-HKD}

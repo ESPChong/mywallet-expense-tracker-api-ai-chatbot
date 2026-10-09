@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCents, monthLabel, ordinalDay } from '@/lib/format';
-import type { Income } from '@/types/api';
+import { formatCents, monthLabel, ordinalDay } from '@mywallet/shared/src/format';
+import type { Income } from '@mywallet/shared/src/types/api';
 
 type ToggleMutation = ReturnType<typeof useToggleIncome>;
 

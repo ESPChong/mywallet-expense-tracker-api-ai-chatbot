@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { objectIdSchema, incomeUpdateSchema } from '@/lib/validations';
+import { objectIdSchema, incomeUpdateSchema } from '@mywallet/shared/src/validations';
 import { materializeUserIncomeSafe } from '@/services/incomeService';
 
 type RouteParams = { params: Promise<{ id: string }> };

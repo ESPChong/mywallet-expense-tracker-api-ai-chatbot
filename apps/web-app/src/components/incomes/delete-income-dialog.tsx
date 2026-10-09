@@ -2,9 +2,9 @@
 
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCents, ordinalDay } from '@/lib/format';
+import { formatCents, ordinalDay } from '@mywallet/shared/src/format';
 import { useDeleteIncome, useToggleIncome } from '@/hooks/use-incomes';
-import type { Income } from '@/types/api';
+import type { Income } from '@mywallet/shared/src/types/api';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,

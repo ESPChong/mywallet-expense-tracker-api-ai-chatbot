@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { loginSchema } from '@/lib/validations';
+import { loginSchema } from '@mywallet/shared/src/validations';
 import { generateSessionToken, hashSessionToken } from '@/lib/session';
 import {
   checkWindowRateLimit,

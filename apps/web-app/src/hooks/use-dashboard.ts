@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-import type { DashboardData } from '@/types/api';
+import type { DashboardData } from '@mywallet/shared/src/types/api';
 
 export const dashboardKeys = {
   all: ['dashboard'] as const,

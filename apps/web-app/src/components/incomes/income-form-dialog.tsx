@@ -8,8 +8,8 @@ import { z } from 'zod';
 import { ApiError } from '@/lib/api-client';
 import { fieldErrorsFromApi } from '@/lib/form-errors';
 import { useCreateIncome, useUpdateIncome } from '@/hooks/use-incomes';
-import { ordinalDay } from '@/lib/format';
-import type { Income } from '@/types/api';
+import { ordinalDay } from '@mywallet/shared/src/format';
+import type { Income } from '@mywallet/shared/src/types/api';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

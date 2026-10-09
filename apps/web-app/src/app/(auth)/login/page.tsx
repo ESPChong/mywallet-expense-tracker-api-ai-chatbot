@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import type { z } from 'zod';
-import { loginSchema } from '@/lib/validations';
+import { loginSchema } from '@mywallet/shared/src/validations';
 import { api, ApiError } from '@/lib/api-client';
 import { fieldErrorsFromApi } from '@/lib/form-errors';
 import { Button } from '@/components/ui/button';

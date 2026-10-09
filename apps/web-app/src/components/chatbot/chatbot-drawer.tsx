@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useSearchParams } from 'next/navigation';
-import { isValidMonthString } from '@/lib/format';
+import { isValidMonthString } from '@mywallet/shared/src/format';
 import { MarkdownMessage } from '@/components/chatbot/markdown-message';
 
 interface Message {

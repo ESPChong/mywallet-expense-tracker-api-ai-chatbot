@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
-import type { Category } from '@/types/api';
+import type { Category } from '@mywallet/shared/src/types/api';
 
 export const categoryKeys = {
   all: ['categories'] as const,

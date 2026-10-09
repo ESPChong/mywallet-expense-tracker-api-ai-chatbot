@@ -13,8 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { currentMonthString, formatCents, formatDateShort, isValidMonthString } from '@/lib/format';
-import type { Expense } from '@/types/api';
+import {
+  currentMonthString,
+  formatCents,
+  formatDateShort,
+  isValidMonthString,
+} from '@mywallet/shared/src/format';
+import type { Expense } from '@mywallet/shared/src/types/api';
 
 export default function ExpensesPage() {
   const router = useRouter();

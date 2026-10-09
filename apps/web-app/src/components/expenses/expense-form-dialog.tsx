@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api-client';
 import { fieldErrorsFromApi } from '@/lib/form-errors';
 import { useCategories } from '@/hooks/use-categories';
 import { useCreateExpense, useUpdateExpense } from '@/hooks/use-expenses';
-import type { Expense } from '@/types/api';
+import type { Expense } from '@mywallet/shared/src/types/api';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

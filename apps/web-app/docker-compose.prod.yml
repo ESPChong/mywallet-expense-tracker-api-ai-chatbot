@@ -13,7 +13,8 @@ services:
 
   app:
     build:
-      context: .
+      context: ../..
+      dockerfile: apps/web-app/Dockerfile
       args:
         NEXT_PUBLIC_CURRENCY: ${NEXT_PUBLIC_CURRENCY:-HKD}
     environment:

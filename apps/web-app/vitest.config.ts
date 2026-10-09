@@ -16,7 +16,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
-      '@mywallet/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
+      '@mywallet/shared': path.resolve(__dirname, '../../packages/shared'),
       'next/headers': path.resolve(__dirname, 'src/tests/mocks/next-headers.ts'),
     },
   },

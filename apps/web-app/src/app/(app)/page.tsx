@@ -7,7 +7,7 @@ import { MonthPicker } from '@/components/month-picker';
 import { StatCard, StatCardSkeleton } from '@/components/dashboard/stat-card';
 import { SpendingBreakdown } from '@/components/dashboard/spending-breakdown';
 import { ActivityFeed } from '@/components/dashboard/activity-feed';
-import { currentMonthString, isValidMonthString, monthLabel } from '@/lib/format';
+import { currentMonthString, isValidMonthString, monthLabel } from '@mywallet/shared/src/format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
