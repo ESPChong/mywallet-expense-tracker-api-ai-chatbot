@@ -19,17 +19,11 @@ jobs:
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}
-
-      - name: Warm MongoDB binary (cold-start download happens here)
+      - name: Warm MongoDB binary (cold-start download)
         timeout-minutes: 10
         env:
           MONGOMS_DEBUG: "1"
-        run: |
-          node -e "const { const MongoMemoryServer } = require('mongodb-memory-server');
-          MongoMemoryServer.create()
-            .then((m) => m.stop())
-            .then(() => console.log('mongod binary OK'))
-            .catch((e) => { console.error(e); process.exit(1); });"
+        run: node apps/web-app/src/scripts/warm-mongo-cache.mjs
 
       - run: npm run web:lint
       - run: npm run web:typecheck
