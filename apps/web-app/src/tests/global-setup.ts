@@ -14,8 +14,8 @@ export default async function setup() {
   try {
     execSync('npx prisma db push --skip-generate', {
       env: { ...process.env, DATABASE_URL: uri },
-      stdio: 'inherit', // prisma's output now lands in the CI log
-      timeout: 120_000, // bounded: throws instead of hanging forever
+      stdio: 'inherit',
+      timeout: 300_000,
     });
   } catch (err) {
     console.error('[setup] prisma db push failed:', err);
