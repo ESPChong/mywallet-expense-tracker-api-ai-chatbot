@@ -19,10 +19,24 @@ jobs:
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}
+
+      - name: Warm MongoDB binary (cold-start download happens here)
+        timeout-minutes: 10
+        env:
+          MONGOMS_DEBUG: "1"
+        run: |
+          node -e "const { const MongoMemoryServer } = require('mongodb-memory-server');
+          MongoMemoryServer.create()
+            .then((m) => m.stop())
+            .then(() => console.log('mongod binary OK'))
+            .catch((e) => { console.error(e); process.exit(1); });"
+
       - run: npm run web:lint
       - run: npm run web:typecheck
       - run: npm run web:test
       - run: npm run web:build
+
+    timeout-minutes: 20
 
   e2e:
     runs-on: ubuntu-latest
@@ -47,6 +61,7 @@ jobs:
           name: playwright-report
           path: apps/web-app/playwright-report/
           retention-days: 7
+    timeout-minutes: 20
 
   docker-build:
     runs-on: ubuntu-latest
