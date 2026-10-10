@@ -4,17 +4,24 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 let replSet: MongoMemoryReplSet | undefined;
 
 export default async function setup() {
-  console.log('[setup] global-setup start');
-  console.log('[setup] starting mongo…');
   replSet = await MongoMemoryReplSet.create();
-  const uri = replSet.getUri('expense-tracker-test');
-  console.log(`[setup] mongo up at ${uri}`);
+
+  const uri = `${replSet.getUri('expense-tracker-test')}&directConnection=true`;
   process.env.DATABASE_URL = uri;
 
-  execSync('npx prisma db push --skip-generate', {
-    env: { ...process.env, DATABASE_URL: uri },
-    stdio: 'pipe', // keep npx/prisma chatter out of the test output
-  });
+  console.log(`[setup] mongo up at ${uri}`);
+  console.log('[setup] pushing schema…');
+  try {
+    execSync('npx prisma db push --skip-generate', {
+      env: { ...process.env, DATABASE_URL: uri },
+      stdio: 'inherit', // prisma's output now lands in the CI log
+      timeout: 120_000, // bounded: throws instead of hanging forever
+    });
+  } catch (err) {
+    console.error('[setup] prisma db push failed:', err);
+    throw err;
+  }
+  console.log('[setup] schema pushed');
 }
 
 export async function teardown() {
