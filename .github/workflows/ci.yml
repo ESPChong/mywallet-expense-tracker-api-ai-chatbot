@@ -24,7 +24,10 @@ jobs:
         env:
           MONGOMS_DEBUG: "1"
         run: node apps/web-app/src/scripts/warm-mongo-cache.mjs
-
+      - name: Prisma push smoke
+        working-directory: apps/web-app
+        timeout-minutes: 3
+        run: node src/scripts/prisma-push-smoke.mjs
       - run: npm run web:lint
       - run: npm run web:typecheck
       - run: npm run web:test

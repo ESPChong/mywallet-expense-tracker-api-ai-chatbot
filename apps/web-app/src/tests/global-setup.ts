@@ -1,7 +1,12 @@
-import { execSync } from 'node:child_process';
+// import { execSync } from 'node:child_process';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 
 let replSet: MongoMemoryReplSet | undefined;
+
+const require = createRequire(import.meta.url);
+const prismaCli = require.resolve('prisma');
 
 export default async function setup() {
   replSet = await MongoMemoryReplSet.create();
@@ -12,10 +17,10 @@ export default async function setup() {
   console.log(`[setup] mongo up at ${uri}`);
   console.log('[setup] pushing schema…');
   try {
-    execSync('npx prisma db push --skip-generate', {
+    execFileSync(process.execPath, [prismaCli, 'db', 'push', '--skip-generate'], {
       env: { ...process.env, DATABASE_URL: uri },
-      stdio: 'inherit',
-      timeout: 300_000,
+      stdio: ['ignore', 'inherit', 'inherit'],
+      timeout: 120_000,
     });
   } catch (err) {
     console.error('[setup] prisma db push failed:', err);
