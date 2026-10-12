@@ -28,6 +28,14 @@ jobs:
         working-directory: apps/web-app
         timeout-minutes: 3
         run: node src/scripts/prisma-push-smoke.mjs
+      - name: Inspect while hung
+        working-directory: apps/web-app
+        run: |
+          node src/scripts/prisma-push-smoke.mjs & SMOKE=$!
+          sleep 45
+          ps -eo pid,ppid,stat,wchan:32,cmd | grep -E 'prisma|mongod' | grep -v grep || true
+          for p in $(pgrep -f schema-engine); do echo "== $p =="; ls -l /proc/$p/fd; done || true
+          kill $SMOKE || true
       - run: npm run web:lint
       - run: npm run web:typecheck
       - run: npm run web:test
