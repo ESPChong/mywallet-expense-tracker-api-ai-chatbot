@@ -27,6 +27,7 @@ jobs:
       - name: "A: baseline smoke (should hang ~90s)"
         working-directory: apps/web-app
         timeout-minutes: 4
+        continue-on-error: true
         run: node src/scripts/prisma-push-smoke.mjs
 
       - name: "B: smoke with update-check disabled"
